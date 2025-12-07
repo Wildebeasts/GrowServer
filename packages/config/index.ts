@@ -1,6 +1,54 @@
-import { readFileSync } from "fs";
-import { join } from "path";
+import { readFileSync, existsSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { parse } from "smol-toml";
+
+const getConfigPath = (): string => {
+  let currentDir: string;
+  
+  if (typeof __dirname !== "undefined") {
+    currentDir = __dirname;
+  } else {
+    currentDir = dirname(fileURLToPath(import.meta.url));
+  }
+  
+  // Try current directory first
+  let configPath = join(currentDir, "config.toml");
+  if (existsSync(configPath)) {
+    return configPath;
+  }
+  
+  // Try parent directory
+  configPath = join(dirname(currentDir), "config.toml");
+  if (existsSync(configPath)) {
+    return configPath;
+  }
+  
+  // Try to find workspace root by looking for package.json with workspaces
+  let searchDir = currentDir;
+  for (let i = 0; i < 10; i++) {
+    const packageJsonPath = join(searchDir, "package.json");
+    if (existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+      
+      // Check if this is the workspace root
+      if (packageJson.workspaces || existsSync(join(searchDir, "pnpm-workspace.yaml"))) {
+
+        // Found workspace root, check packages/config/config.toml
+        configPath = join(searchDir, "packages", "config", "config.toml");
+        if (existsSync(configPath)) {
+          return configPath;
+        }
+      }
+    }
+    const parentDir = dirname(searchDir);
+    if (parentDir === searchDir) break; // Reached filesystem root
+    searchDir = parentDir;
+  }
+  
+  // Fallback to current directory
+  return join(currentDir, "config.toml");
+};
 
 export interface WebConfig {
   development: boolean;
@@ -39,7 +87,7 @@ export interface Config {
   server: ServerConfig;
 }
 
-const configPath = join(__dirname, "config.toml");
+const configPath = getConfigPath();
 const configContent = readFileSync(configPath, "utf-8");
 const config = parse(configContent) as unknown as Config;
 const frontend = () => {
@@ -59,5 +107,5 @@ const logon = () => {
   };
 };
 
-export * from "./eslint";
+export * from "./eslint.js";
 export { config, frontend, logon };

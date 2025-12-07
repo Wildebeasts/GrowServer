@@ -50,20 +50,34 @@ and access it on here https://local.drizzle.studio/
 To run the development server by
 
 ```
-$ pnpm run start
+$ pnpm run dev
 ```
 
 ## Development
 
-In order to make new login system work you need to install [mkcert](https://github.com/FiloSottile/mkcert) on this [download page](https://github.com/FiloSottile/mkcert/releases) (I'd recommend using [Lets encrypt](https://letsencrypt.org/getting-started/) for production only)
+In order to make new login system work you need to setup caddy on this [local https](https://caddyserver.com/docs/automatic-https#local-https) (I'd recommend using [Lets encrypt](https://letsencrypt.org/getting-started/) for production only)
 
-### Local CA installation
+### HTTPS CA installation
+For Production: If you want to deploy this into server, make sure to comment some `tls internal` inside `Caddyfile` since it require to request LetsEncrypt to request your domain to register and obtain the SSL cert.
 
-Install the mkcert local CA by
+For Local: As the caddy server already automated the process, you should navigate to [Caddy Server](#caddy-server)
 
+
+### Caddy server
+For developemnt only you can skip this part if you're trying to deploy to server.
+
+Since the we're running the separated caddy instead of from the docker one, you have to download the caddy server from [here](https://caddyserver.com/download)
+
+Or you could using this command (windows user)
+```sh
+$ winget install Caddy.Caddy
 ```
-$ mkcert -install
+
+And run the caddy server by
+```sh
+$ caddy run --config Caddyfile
 ```
+
 
 ### Hosts
 
@@ -72,7 +86,7 @@ For the hosts file you can see this example below
 ```
 127.0.0.1 www.growtopia1.com
 127.0.0.1 www.growtopia2.com
-127.0.0.1 login.growserver.app # New login system for development purposes
+127.0.0.1 growserver.app # New login system for development purposes
 ```
 
 ## Docker
@@ -83,7 +97,7 @@ To run the dockerized & running it automatically just run
 docker compose up -d
 ```
 
-or you want to run the database & redis only (this were for development only) then simply running
+or you want to run the database & redis only (this for development only) then simply running
 
 ```sh
 docker compose up -d db redis

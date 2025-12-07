@@ -1,4 +1,4 @@
-import { type BetterAuthOptions } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { username, admin as adminPlugin, captcha, emailOTP } from "better-auth/plugins";
 
 export const authConfig: BetterAuthOptions = {

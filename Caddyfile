@@ -1,0 +1,42 @@
+# HTTP configuration - proxies to the main app
+http://:80 {
+    reverse_proxy localhost:3000 {
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+        header_up Host {http.request.host}
+    }
+}
+
+# HTTPS configuration for handling logon server
+https://:443 {
+    handle /growtopia/server_data.php {
+        reverse_proxy localhost:3001 {
+            header_up Upgrade {http.request.header.Upgrade}
+            header_up Connection {http.request.header.Connection}
+            header_up Host {http.request.host}
+        }
+    }
+    
+    handle {
+        respond 404
+    }
+}
+
+# Domain-specific configuration for growserver.app using automatic local HTTPS
+# Change this if you own a specific domain
+growserver.app {
+
+    # Please comment this if you using actual domain
+    tls internal
+    
+    reverse_proxy localhost:3000 {
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+        header_up Host {http.request.host}
+    }
+}
+
+# HTTP to HTTPS redirect for growserver.app
+http://growserver.app {
+    redir https://growserver.app{uri} permanent
+}

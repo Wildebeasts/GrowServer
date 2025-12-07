@@ -5,10 +5,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "8080:8080"
-      - "443:443"
-      - "17091:17091/udp"
+      - "17091-17095:17091-17095/udp"
+      - "3000-3001:3000-3001/tcp"
     depends_on:
       - db
       - redis
@@ -31,7 +29,23 @@ services:
       - redis_data:/var/lib/redis/data
     ports:
       - "6379:6379"
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
 
 volumes:
   mongodb_data:
   redis_data:
+  caddy_data:
+  caddy_config:

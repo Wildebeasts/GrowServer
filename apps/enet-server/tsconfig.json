@@ -10,6 +10,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
     "checkJs": true,
@@ -19,11 +23,10 @@
     "noEmitOnError": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "types": ["@types/bun"],
+    "types": ["@types/bun", "@types/node"],
     "rootDir": ".",
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
+    "experimentalDecorators": true,
   },
-  "exclude": ["node_modules"],
-    "include": ["src/**/*", "src/types/**/*", "scripts/**/*", "drizzle.config.ts", "eslint.config.ts"]
+  "exclude": ["node_modules", "./node_modules", "./node_modules/**/*"],
+  "include": ["src/**/*", "src/types/**/*", "scripts/**/*", "drizzle.config.ts", "eslint.config.ts"]
 }

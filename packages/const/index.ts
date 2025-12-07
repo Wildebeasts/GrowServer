@@ -3,12 +3,20 @@ export const ITEMS_DAT_URL =
 export const ITEMS_DAT_FETCH_URL =
   "https://raw.githubusercontent.com/StileDevs/itemsdat-archive/refs/heads/main/latest.json";
 
+export enum ServerState {
+  MAINTENANCE,
+  STARTING,
+  RUNNING,
+  STOPPING,
+  STOPPED,
+};
+
 export enum PacketTypes {
   HELLO = 1,
   STR = 2,
   ACTION = 3,
   TANK = 4,
-}
+};
 
 export const WORLD_SIZE = {
   WIDTH: 100,
@@ -37,13 +45,13 @@ export enum ClothTypes {
   MASK = 7,
   NECKLACE = 8,
   ANCES = 9,
-}
+};
 
 export enum JammerEffect {
   ZOMBIE,
   PUNCH,
   SIGNAL
-}
+};
 
 export const CLOTH_MAP: { [key in ClothTypes]: string } = {
   [ClothTypes.ANCES]: "ances",

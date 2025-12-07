@@ -36,12 +36,7 @@ async function init() {
     serve(
       {
         fetch: app.fetch,
-        createServer,
-        serverOptions: {
-          key: ssl.tls.key,
-          cert: ssl.tls.cert,
-        },
-        port: config.web.port,
+        port:  config.web.port,
       },
       (info) => {
         logger.info(`Node Logon Server is running on port ${info.port}`);
@@ -51,11 +46,7 @@ async function init() {
     logger.info(`Bun Logon Server is running on port ${config.web.port}`);
     Bun.serve({
       fetch: app.fetch,
-      port: config.web.port,
-      tls: {
-        key: ssl.tls.key,
-        cert: ssl.tls.cert,
-      },
+      port:  config.web.port,
     });
   }
 }

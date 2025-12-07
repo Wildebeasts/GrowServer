@@ -15,7 +15,5 @@
     "node": ">=18.0.0",
     "npm": ">=7.0.0"
   },
-  "dependencies": {
-    "@growserver/types": "workspace:*"
-  }
+  "dependencies": {}
 }

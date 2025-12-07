@@ -5,7 +5,7 @@ export default [
   {
     languageOptions: {
       parserOptions: {
-        project: true,
+        project:         true,
         tsconfigRootDir: __dirname,
       },
     },
