@@ -78,6 +78,12 @@ And run the caddy server by
 $ caddy run --config Caddyfile
 ```
 
+Or if you on development you should use this instead
+And run the caddy server by
+```sh
+$ caddy run --config Caddyfile.dev
+```
+
 
 ### Hosts
 

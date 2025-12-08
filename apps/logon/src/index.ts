@@ -15,7 +15,7 @@ async function init() {
     await next();
   });
 
-  app.post("/growtopia/server_data.php", (ctx) => {
+  app.all("/growtopia/server_data.php", (ctx) => {
     let str = "";
 
     str += `server|${config.web.address}\n`;
