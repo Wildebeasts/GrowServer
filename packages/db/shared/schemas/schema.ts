@@ -1,4 +1,6 @@
-import { Schema, model } from "mongoose";
+import mongoose from "mongoose";
+
+const { Schema, model, models } = mongoose;
 
 const userSchema = new Schema({
   name:          { type: String, required: true },
@@ -13,7 +15,7 @@ const userSchema = new Schema({
   banReason:     { type: String },
   banExpires:    { type: Date },
   playerId:      { type: Schema.Types.ObjectId, ref: "Player" },
-}, { timestamps: true });
+}, { timestamps: true, collection: "user" });
 
 const sessionSchema = new Schema({
   userId:    { type: String, required: true, index: true },
@@ -23,7 +25,7 @@ const sessionSchema = new Schema({
   userAgent: { type: String },
   createdAt: { type: Date, required: true, default: Date.now },
   updatedAt: { type: Date, required: true, default: Date.now },
-}, { timestamps: true });
+}, { timestamps: true, collection: "session" });
 
 const accountSchema = new Schema({
   userId:                { type: String, required: true, index: true },
@@ -38,7 +40,7 @@ const accountSchema = new Schema({
   password:              { type: String },
   createdAt:             { type: Date, required: true, default: Date.now },
   updatedAt:             { type: Date, required: true, default: Date.now },
-}, { timestamps: true });
+}, { timestamps: true, collection: "account" });
 
 accountSchema.index({ providerId: 1, accountId: 1 }, { unique: true });
 
@@ -48,7 +50,7 @@ const verificationSchema = new Schema({
   expiresAt:  { type: Date, required: true, index: true },
   createdAt:  { type: Date, required: true, default: Date.now },
   updatedAt:  { type: Date, required: true, default: Date.now },
-}, { timestamps: true });
+}, { timestamps: true, collection: "verification" });
 
 const playerSchema = new Schema({
   name: { 
@@ -82,7 +84,8 @@ const playerSchema = new Schema({
     }],
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  collection: "player"
 });
 
 const worldSchema = new Schema({
@@ -133,17 +136,18 @@ const worldSchema = new Schema({
     }
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  collection: "world"
 });
 
 // GrowServer Schema
-export const PlayerModel = model("Player", playerSchema);
-export const WorldModel = model("World", worldSchema);
+export const PlayerModel = models.Player || model("Player", playerSchema);
+export const WorldModel = models.World || model("World", worldSchema);
 
 // better-auth Schema
-export const UserModel = model("User", userSchema);
-export const SessionModel = model("Session", sessionSchema);
-export const AccountModel = model("Account", accountSchema);
-export const VerificationModel = model("Verification", verificationSchema);
+export const UserModel = models.User || model("User", userSchema);
+export const SessionModel = models.Session || model("Session", sessionSchema);
+export const AccountModel = models.Account || model("Account", accountSchema);
+export const VerificationModel = models.Verification || model("Verification", verificationSchema);
 
 

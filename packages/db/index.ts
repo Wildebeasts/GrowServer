@@ -1,5 +1,5 @@
 export * from "./Database";
-export * from "./shared";
+export * from "./shared/schemas";
 export * from "./auth";
 export * from "./handlers/PlayerHandler";
 export * from "./handlers/WorldHandler";

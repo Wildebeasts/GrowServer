@@ -18,7 +18,7 @@ https://localhost:443, https://www.growtopia1.com:443 {
             header_up Host {http.request.host}
         }
     }
-    
+
     handle {
         respond 404
     }
@@ -30,8 +30,8 @@ growserver.app {
 
     # Please comment this if you using actual domain
     #tls internal
-    
-    reverse_proxy localhost:3000 {
+
+    reverse_proxy localhost:4321 {
         header_up Upgrade {http.request.header.Upgrade}
         header_up Connection {http.request.header.Connection}
         header_up Host {http.request.host}

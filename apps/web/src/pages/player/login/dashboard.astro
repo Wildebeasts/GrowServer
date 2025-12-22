@@ -1,0 +1,23 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout>
+  <div class="flex justify-center absolute top-1/2 left-1/2 mr-[-%50] -translate-x-1/2 -translate-y-1/2">
+    <div class="card w-96 bg-base-200 card-lg shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title justify-center font-bold mb-2">Welcome to GrowServer</h1>
+        <div class="flex flex-col gap-2 justify-center items-center">
+          <a href="/player/login/legacy-login" class="btn btn-wide btn-primary">Legacy Login</a>
+          <a
+            href="/player/login/legacy-login"
+            class="btn btn-wide btn-primary bg-[#7289da] text-white border-[#7289da] hover:bg-[#5e7adc] hover:border-[#5e7adc]">Discord</a
+          >
+          <div class="mt-2 w-full flex flex-col gap-2 justify-center items-center">
+            <a href="/player/register/legacy-register" class="btn btn-wide btn-info w-full">Legacy Register</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

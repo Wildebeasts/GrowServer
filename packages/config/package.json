@@ -6,7 +6,8 @@
   "description": "GrowServer config files",
   "main": "./index.ts",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./eslint": "./eslint.ts"
   },
   "author": "JadlionHD <jadlion.dev@gmail.com>",
   "license": "MIT",

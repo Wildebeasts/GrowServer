@@ -31,30 +31,46 @@ export class Database {
 
   public player: PlayerHandler;
   public world: WorldHandler;
-  public redis: RedisHandler;
+  // public redis: RedisHandler;
+  private dbUrl: string;
+  private isConnected: boolean = false;
 
-  constructor() {
-    this.connection = new MongoClient(process.env.DATABASE_URL as string);
-
+  constructor(dbUrl: string) {
+    this.dbUrl = dbUrl;
+    this.connection = new MongoClient(dbUrl);
     this.db = this.connection.db();
     this.auth = betterAuth(Object.assign({
       database: mongodbAdapter(this.db, {
-        client: this.connection, 
+        client:      this.connection,
+        transaction: false
       }),
     }, authConfig));
 
     this.player = new PlayerHandler(this.connection, this.db);
     this.world = new WorldHandler(this.connection, this.db);
-    this.redis = new RedisHandler();
+    // this.redis = new RedisHandler();
+  }
+
+  public async connect() {
+    if (this.isConnected) return;
+    
+    await this.connection.connect();
+    await mongoose.connect(this.dbUrl);
+    this.isConnected = true;
   }
 
   public async setup() {
-    await this.redis.connect();
-    await setupSeeds();
+    await this.connect();
+    // await this.redis.connect();
+    // await setupSeeds();
   }
 
   public async close() {
-    await this.redis.disconnect();
-    await this.connection.close();
+    // await this.redis.disconnect();
+    if (this.isConnected) {
+      await mongoose.disconnect();
+      await this.connection.close();
+      this.isConnected = false;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { eslintConfig } from "@growserver/config";
+import { eslintConfig } from "@growserver/config/eslint";
 
 export default [
   ...eslintConfig,
