@@ -1,10 +1,15 @@
 import { Database } from "@growserver/db";
-import logger from "@growserver/logger";
+import { CommandManager } from "./CommandManager";
+import { EventManager } from "./EventManager";
 import { Server } from "./Server";
 
 export class Base {
   public servers: Server[];
   public database: Database;
+  public manager = {
+    commands: new CommandManager(),
+    events:   new EventManager()
+  };
 
   constructor() {
     this.database = new Database(process.env.DATABASE_URL!);
@@ -14,10 +19,17 @@ export class Base {
     ];
   }
 
-  public init() {
-    this.servers.forEach((s) => {
+  public async init() {
+    await this.manager.commands.init();
+    await this.manager.events.init();
+
+    for (const [i, s] of this.servers.entries()) {
+      s.server.on("connect", (netID) => this.manager.events.data.get("connect")?.execute(i, netID));
+      s.server.on("ready", () => this.manager.events.data.get("ready")?.execute(i, s.port));
+      s.server.on("raw", (netID, channelID, data) => this.manager.events.data.get("raw")?.execute(i, netID, channelID, data));
+      s.server.on("disconnect", (netID) => this.manager.events.data.get("disconnect")?.execute(i, netID));
+
       s.server.listen();
-      logger.info(`ENet Server with port ${s.port} running`);
-    });
+    }
   }
 }

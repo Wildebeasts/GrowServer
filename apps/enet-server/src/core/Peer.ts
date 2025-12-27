@@ -1,13 +1,13 @@
-import {
-  Peer as OldPeer,
-  TankPacket,
-  TextPacket,
-  Variant,
-  VariantOptions,
-} from "growtopia.js";
-import { PeerData } from "@growserver/types";
-import { Name } from "@/network/player/Name";
-import { Base } from "./Base";
+// import {
+//   Peer as OldPeer,
+//   TankPacket,
+//   TextPacket,
+//   Variant,
+//   VariantOptions,
+// } from "growtopia.js";
+// import { PeerData } from "@growserver/types";
+// import { Name } from "@/network/player/Name";
+// import { Base } from "./Base";
 
 // export class Peer extends OldPeer<PeerData> {
 //   constructor(public base: Base, public netID: number, public channelID: number) {
