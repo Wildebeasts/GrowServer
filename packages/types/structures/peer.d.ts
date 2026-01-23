@@ -10,7 +10,7 @@ export interface PeerData {
   netID: number;
   country: string;
   platformID?: string;
-  userID: number;
+  userId: string;
   role: string;
   gems: number;
   clothing: Clothing;

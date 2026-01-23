@@ -6,6 +6,7 @@ import { CooldownOptions, PeerData, WorldData } from "@growserver/types";
 import { Debug, ThrowError } from "@/decorators";
 import { Database } from "@growserver/db";
 import logger from "@growserver/logger";
+import { Peer } from "./Peer";
 
 interface CacheEntry<T> {
   data: T;
@@ -103,6 +104,18 @@ export class ServerData {
     // Update last accessed time
     entry.lastAccessed = Date.now();
     return entry.data;
+  }
+
+  /**
+   * Get a peer instance by netID & server instance
+   */
+  @Debug()
+  public getPeerInstance(server: Server, netID: number): Peer | undefined {
+    const data = this.getPeer(netID);
+
+    if (data)
+      return new Peer(server, netID);
+    else return undefined;
   }
 
   /**

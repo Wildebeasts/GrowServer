@@ -8,13 +8,14 @@ export abstract class Manager<T> {
 
   public name: string = "";
   public data = new Collection<string, T>();
-  public directory: string = join(__dirname, "..", "commands");
-  private watcher: FSWatcher | null = null;
+  public directories: string[] = [];
+  private watchers: FSWatcher[] = [];
 
   constructor() {}
 
   abstract init(): Promise<void>;
-  abstract load(): Promise<void>;
+  abstract load(index: number): Promise<void>;
+  abstract loadAll(): Promise<void>;
   abstract register(filePath: string): Promise<void>;
 
   public getFile(filePath: string): T | undefined {
@@ -57,30 +58,68 @@ export abstract class Manager<T> {
   }
 
   protected watch() {
-    this.watcher = watch(this.directory, {
-      /* eslint no-useless-escape: "off" */
-      ignored:       /(^|[\/\\])\../,
-      persistent:    true,
-      ignoreInitial: true,
-      depth:         99
-    });
-
-    this.watcher
-      .on('add', (filePath) => {
-        logger.info(`[${this.name}] [New File] ${basename(filePath)}`);
-        this.register(filePath);
-      })
-      .on('change', (filePath) => {
-        logger.info(`[${this.name}] Reloading ${basename(filePath)}...`);
-        this.register(filePath);
-      })
-      .on('unlink', (filePath) => {
-        // Optional: Handle file deletion (remove from map)
-        logger.info(`[${this.name}] [Deleted] ${basename(filePath)}`);
-        // Note: To delete correctly, you'd need to map paths to command names.
-        // For now, a server restart handles deletions best.
+    for (const directory of this.directories) {
+      const watcher = watch(directory, {
+        /* eslint no-useless-escape: "off" */
+        ignored:       /(^|[\/\\])\../,
+        persistent:    true,
+        ignoreInitial: true,
+        depth:         99
       });
 
-    logger.info(`[${this.name}] Watching for file changes`);
+      watcher
+        .on('add', (filePath) => {
+          logger.info(`[${this.name}] [New File] ${basename(filePath)}`);
+          this.reloadMainDirectory();
+        })
+        .on('change', (filePath) => {
+          logger.info(`[${this.name}] File changed: ${basename(filePath)}`);
+          this.reloadMainDirectory();
+        })
+        .on('unlink', (filePath) => {
+          logger.info(`[${this.name}] [Deleted] ${basename(filePath)}`);
+          this.reloadMainDirectory();
+        });
+
+      this.watchers.push(watcher);
+    }
+
+    logger.info(`[${this.name}] Watching ${this.directories.length} directories for file changes`);
+  }
+
+  private reloadMainDirectory() {
+    if (this.directories.length === 0) return;
+    
+    const mainDirectory = this.directories[0];
+    const files = this.getFiles(mainDirectory);
+    
+    this.data.clear();
+    
+    logger.info(`[${this.name}] Reloading ${files.length} files from main directory`);
+    
+    files.forEach(file => {
+      this.register(file);
+    });
+  }
+
+
+  protected clearModuleCache(filePath: string) {
+    const resolvedPath = require.resolve(filePath);
+    const module = require.cache[resolvedPath];
+    
+    if (module) {
+      // Recursively clear child modules, but only those within the project
+      module.children.forEach((child) => {
+        // Only clear modules that are within the project directory
+        // Skip node_modules and Node.js internal modules
+        if (child.id.includes('node_modules') || !child.id.includes('enet-server')) {
+          return;
+        }
+        this.clearModuleCache(child.id);
+      });
+      
+      // Delete the module from cache
+      delete require.cache[resolvedPath];
+    }
   }
 }

@@ -12,7 +12,7 @@ export default class EventReady extends IEvent {
 
   @Debug()
   @ThrowError("Failed to call Ready event")
-  public async execute(serverID: number, server: Server, database: Database) {
+  public async execute(serverID: number, server: Server) {
     logger.info(`[S-${serverID}] Ready with port ${server.port}`);
   }
 }

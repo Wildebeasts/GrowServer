@@ -12,15 +12,40 @@ export enum ServerState {
 };
 
 export enum PacketTypes {
+  UNK = 0,
   HELLO = 1,
   TEXT = 2,
   ACTION = 3,
   TANK = 4,
+  ERROR = 5,
+  TRACK = 6,
+  CLIENT_LOG_REQ = 7,
+  CLIENT_LOG_RES = 8,
+  MAX = 9,
 };
 
 export const WORLD_SIZE = {
   WIDTH: 100,
   HEIGHT: 60,
+};
+
+export enum PlatformID
+{
+    UNKNOWN = -1,
+    WINDOWS,
+    IOS, //iPhone/iPad etc
+    OSX,
+    LINUX,
+    ANDROID,
+    WINDOWS_MOBILE, //yeah, right.  Doesn't look like we'll be porting here anytime soon.
+    WEBOS,
+    BBX, //RIM Playbook
+    FLASH,
+    HTML5, //javascript output via emscripten for web
+    PSVITA,
+
+    //new platforms will be added above here.  Don't count on PLATFORM_ID_COUNT not changing!
+    COUNT
 };
 
 export const STRING_CIPHER_KEY = "PBG892FXX982ABC*";

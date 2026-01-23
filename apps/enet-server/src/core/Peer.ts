@@ -1,4 +1,4 @@
-import { Name } from "@/network/player/Name";
+import { Name } from "@/network/player/PlayerName";
 import { PeerData } from "@growserver/types";
 import {
   Peer as OldPeer

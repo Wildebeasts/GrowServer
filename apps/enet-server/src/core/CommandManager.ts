@@ -8,7 +8,9 @@ import { join } from "path";
 export class CommandManager extends Manager<ICommand> {
 
   public name = "CommandManager";
-  public directory: string = join(__dirname, "..", "commands");
+  public directories: string[] = [
+    join(__dirname, "..", "commands")
+  ];
 
   constructor() {
     super();
@@ -22,20 +24,39 @@ export class CommandManager extends Manager<ICommand> {
   }
 
   @Debug()
-  @ThrowError("Failed to load commands on CommandManager")
-  public async load() {
-    const files = this.getFiles(this.directory);
-    logger.info(`[${this.name}] Found ${files.length} command files.`);
+  @ThrowError("Failed to loadAll command on CommandManager")
+  public async loadAll() {
+    let allFiles: string[] = [];
+    
+    for (const directory of this.directories) {
+      const files = this.getFiles(directory);
+      allFiles = allFiles.concat(files);
+    }
+    
+    logger.info(`[${this.name}] Found ${allFiles.length} event files across ${this.directories.length} directories.`);
 
-    files.forEach(file => {
+    allFiles.forEach(file => {
+      console.log(file);
       this.register(file);
     });
+  }
+
+  @Debug()
+  @ThrowError("Failed to load command on CommandManager")
+  public async load(index: number = 0) {
+    const files = this.getFiles(this.directories[index]);
+
+    logger.info(`[${this.name}] Found ${files.length} event files.`);
+    for (const file of files) {
+      this.register(file);
+    }
   }
 
   @Debug()
   @ThrowError("Failed to register a command on CommandManager")
   public async register(filePath: string) {
     try {
+      this.clearModuleCache(filePath);
       const commandInstance = this.getFile(filePath);
 
       if (!commandInstance) throw new Error(`[${this.name}] No file found`);
@@ -77,4 +98,6 @@ export class CommandManager extends Manager<ICommand> {
     }
     return files;
   }
+
+
 }

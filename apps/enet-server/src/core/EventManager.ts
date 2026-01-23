@@ -8,7 +8,10 @@ import { join } from "path";
 export class EventManager extends Manager<IEvent> {
 
   public name = "EventManager";
-  public directory: string = join(__dirname, "..", "network", "events");
+  public directories: string[] = [
+    join(__dirname, "..", "network", "events"),
+    join(__dirname, "..", "network", "packets")
+  ];
 
   constructor() {
     super();
@@ -22,20 +25,40 @@ export class EventManager extends Manager<IEvent> {
   }
 
   @Debug()
-  @ThrowError("Failed to load events on EventManager")
-  public async load() {
-    const files = this.getFiles(this.directory);
-    logger.info(`[${this.name}] Found ${files.length} event files.`);
+  @ThrowError("Failed to loadAll events on EventManager")
+  public async loadAll() {
+    let allFiles: string[] = [];
+    
+    for (const directory of this.directories) {
+      const files = this.getFiles(directory);
+      allFiles = allFiles.concat(files);
+    }
+    
+    logger.info(`[${this.name}] Found ${allFiles.length} event files across ${this.directories.length} directories.`);
 
-    files.forEach(file => {
+    allFiles.forEach(file => {
+      console.log(file);
       this.register(file);
     });
   }
 
   @Debug()
+  @ThrowError("Failed to load events on EventManager")
+  public async load(index: number = 0) {
+    const files = this.getFiles(this.directories[index]);
+
+    logger.info(`[${this.name}] Found ${files.length} event files.`);
+    for (const file of files) {
+      this.register(file);
+    }
+  }
+
+
+  @Debug()
   @ThrowError("Failed to register a event on EventManager")
   public async register(filePath: string) {
     try {
+      this.clearModuleCache(filePath);
       const eventInstance = this.getFile(filePath);
 
       if (!eventInstance) throw new Error(`[${this.name}] No file found`);
@@ -76,4 +99,6 @@ export class EventManager extends Manager<IEvent> {
     }
     return files;
   }
+
+
 }

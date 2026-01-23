@@ -15,6 +15,7 @@ import {
   VerificationModel,
   WorldModel,
 } from "./shared/schemas/schema";
+import { logger } from "@growserver/logger";
 
 
 export class Database {
@@ -34,11 +35,9 @@ export class Database {
   public player: PlayerHandler;
   public world: WorldHandler;
   // public redis: RedisHandler;
-  private dbUrl: string;
   private isConnected: boolean = false;
 
-  constructor(dbUrl: string) {
-    this.dbUrl = dbUrl;
+  constructor(private dbUrl: string, private enableLogging = false) {
     this.connection = new MongoClient(dbUrl);
     this.db = this.connection.db();
     this.auth = betterAuth(
@@ -115,9 +114,18 @@ export class Database {
   public async connect() {
     if (this.isConnected) return;
 
-    await this.connection.connect();
-    await mongoose.connect(this.dbUrl);
-    this.isConnected = true;
+    
+    try {
+      if (this.enableLogging)
+        logger.info("[DB] Connecting to mongodb");
+      await this.connection.connect();
+      await mongoose.connect(this.dbUrl);
+      this.isConnected = true;
+    } catch (e) {
+      if (this.enableLogging)
+        logger.error("[DB] Failed to connect mongodb: " + e);
+      this.isConnected = false;
+    }
   }
 
   public async setup() {
@@ -134,4 +142,6 @@ export class Database {
       this.isConnected = false;
     }
   }
+
+
 }

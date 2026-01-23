@@ -12,7 +12,13 @@ export default class EventDisconnect extends IEvent {
 
   @Debug()
   @ThrowError("Failed to call Disconnect event")
-  public async execute(serverID: number, server: Server, database: Database, netID: number) {
+  public async execute(serverID: number, server: Server, netID: number) {
     logger.info(`[S-${serverID}] Disconnected netID: ${netID}`);
+
+    if (!server.data.deletePeer(netID)) {
+      logger.warn("Failed to delete peer cache: ");
+      logger.warn({ peer: server.data.getPeer(netID) });
+    };
+
   }
 }

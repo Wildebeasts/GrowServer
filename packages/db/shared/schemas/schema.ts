@@ -70,7 +70,6 @@ const playerSchema = new Schema({
     index:     true,
   },
   displayName: { type: String, required: true },
-  password:    { type: String, required: true },
   role:        { type: String, required: true },
   userId:      { type: Schema.Types.ObjectId, ref: "User" },
   clothing:    {
@@ -159,3 +158,21 @@ export const SessionModel = models.Session || model("Session", sessionSchema);
 export const AccountModel = models.Account || model("Account", accountSchema);
 export const VerificationModel = models.Verification || model("Verification", verificationSchema);
 export const ApiKeyModel = models.ApiKey || model("ApiKey", apiKeySchema);
+
+// Type exports using InferSchemaType
+export type User = mongoose.InferSchemaType<typeof userSchema>;
+export type Session = mongoose.InferSchemaType<typeof sessionSchema>;
+export type Account = mongoose.InferSchemaType<typeof accountSchema>;
+export type Verification = mongoose.InferSchemaType<typeof verificationSchema>;
+export type ApiKey = mongoose.InferSchemaType<typeof apiKeySchema>;
+export type Player = mongoose.InferSchemaType<typeof playerSchema>;
+export type World = mongoose.InferSchemaType<typeof worldSchema>;
+
+// Document types with _id and mongoose methods
+export type UserDocument = mongoose.HydratedDocument<User>;
+export type SessionDocument = mongoose.HydratedDocument<Session>;
+export type AccountDocument = mongoose.HydratedDocument<Account>;
+export type VerificationDocument = mongoose.HydratedDocument<Verification>;
+export type ApiKeyDocument = mongoose.HydratedDocument<ApiKey>;
+export type PlayerDocument = mongoose.HydratedDocument<Player>;
+export type WorldDocument = mongoose.HydratedDocument<World>;

@@ -6,6 +6,7 @@ import { PacketTypes } from "@growserver/const";
 import type { Database } from "@growserver/db";
 import logger from "@growserver/logger";
 import { ExtendBuffer, parseAction } from "@growserver/utils";
+import Text from "../packets/Text";
 
 export default class EventRaw extends IEvent {
   public name: string = "raw";
@@ -15,7 +16,7 @@ export default class EventRaw extends IEvent {
 
   @Debug()
   @ThrowError("Failed to call Raw event")
-  public async execute(serverID: number, server: Server, database: Database,  netID: number, channelID: number, data: Buffer) {
+  public async execute(serverID: number, server: Server, netID: number, channelID: number, data: Buffer) {
     logger.info(`[S-${serverID}] client sending data:\n${data.toString("hex").match(/../g)?.join(" ")}`);
 
     const buf = new ExtendBuffer(0);
@@ -25,13 +26,7 @@ export default class EventRaw extends IEvent {
 
     switch (type) {
       case PacketTypes.TEXT: {
-        const text: Record<string, string> = parseAction(buf.data);
-
-        const ltoken = text.ltoken;
-        const session = await this.validateToken(ltoken, database);
-
-        logger.info({session, ltoken});
-
+        new Text(server, buf, serverID, netID, channelID).execute();
         break;
       }
     }
@@ -54,7 +49,6 @@ export default class EventRaw extends IEvent {
       return null;
     }
     
-    // Check if session is expired
     if (new Date(sessionData.expiresAt) < new Date()) {
       return null;
     }
