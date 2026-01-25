@@ -61,6 +61,11 @@ const apiKeySchema = new Schema({
   updatedAt: { type: Date, required: true, default: Date.now },
 }, { timestamps: true, collection: "apikey" });
 
+const counterSchema = new Schema({
+  _id: { type: String, required: true },
+  seq: { type: Number, required: true, default: 0 },
+}, { collection: "counter" });
+
 const playerSchema = new Schema({
   name: {
     type:      String,
@@ -72,6 +77,7 @@ const playerSchema = new Schema({
   displayName: { type: String, required: true },
   role:        { type: String, required: true },
   userId:      { type: Schema.Types.ObjectId, ref: "User" },
+  uid:         { type: Number, required: true },
   clothing:    {
     shirt:    { type: Number, required: true, default: 0 },
     pants:    { type: Number, required: true, default: 0 },
@@ -151,6 +157,7 @@ const worldSchema = new Schema({
 // GrowServer Schema
 export const PlayerModel = models.Player || model("Player", playerSchema);
 export const WorldModel = models.World || model("World", worldSchema);
+export const CounterModel = models.Counter || model("Counter", counterSchema);
 
 // better-auth Schema
 export const UserModel = models.User || model("User", userSchema);
@@ -167,6 +174,7 @@ export type Verification = mongoose.InferSchemaType<typeof verificationSchema>;
 export type ApiKey = mongoose.InferSchemaType<typeof apiKeySchema>;
 export type Player = mongoose.InferSchemaType<typeof playerSchema>;
 export type World = mongoose.InferSchemaType<typeof worldSchema>;
+export type Counter = mongoose.InferSchemaType<typeof counterSchema>;
 
 // Document types with _id and mongoose methods
 export type UserDocument = mongoose.HydratedDocument<User>;
@@ -176,3 +184,4 @@ export type VerificationDocument = mongoose.HydratedDocument<Verification>;
 export type ApiKeyDocument = mongoose.HydratedDocument<ApiKey>;
 export type PlayerDocument = mongoose.HydratedDocument<Player>;
 export type WorldDocument = mongoose.HydratedDocument<World>;
+export type CounterDocument = mongoose.HydratedDocument<Counter>;

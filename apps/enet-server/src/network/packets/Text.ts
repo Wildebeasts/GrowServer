@@ -58,8 +58,30 @@ export default class Text {
       const ports = config.web.ports;
       const randPort = ports[Math.floor(Math.random() * ports.length)];
 
-      // TODO: create the player data when its empty or not even exist.
-      const player = {} as Record<string, string>;
+      const username = session.user.username;
+
+      if (!username) {
+        return peer.send(
+          Variant.from(
+            "OnConsoleMessage",
+            "`4Failed to create player data`` Username already taken, please try again later.",
+          ),
+        );
+      }
+      // Get or create player data
+      const player = await this.server.database.player.getOrCreatePlayer(userId, {
+        displayName: username,
+        name:        username,
+      });
+
+      if (!player) {
+        return peer.send(
+          Variant.from(
+            "OnConsoleMessage",
+            "`4Failed to create player data`` Please try again later.",
+          ),
+        );
+      }
 
       peer.send(
         Variant.from("SetHasGrowID", 1, player.name, ltoken), // It will store the token on local machine client & sends back when client sends "/checktoken" endpoint.
@@ -67,13 +89,18 @@ export default class Text {
           "OnSendToServer",
           randPort,
           Math.random() * (1000000 - 10000) + 10000,
-          userId, // NOTE: idk if this works with string but yeah lets try
+          player.uid,
           `${config.web.address}|0|${customAlphabet("0123456789ABCDEF", 32)()}`,
           1,
           player.name,
         ),
       );
     }
+
+    // TODO: 
+    // 1. We're making OnSuperMain packet sending
+    // 2. Make a items dat building that seperate items.dat between others platform
+    // 3. then uh, I forgot. I'll check that after all todo's are complete
 
     if (text.tankIDName && text.tankIDPass) {
       // TODO: redirected checktoken and it has session token inside of tankIDPass

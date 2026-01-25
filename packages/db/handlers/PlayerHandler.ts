@@ -1,54 +1,53 @@
-import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
-import { PlayerModel, UserModel } from "../shared/schemas/schema";
+import { PlayerModel, UserModel, CounterModel, PlayerDocument } from "../shared/schemas/schema";
 import { type Db, type MongoClient } from "mongodb";
 
 export class PlayerHandler {
   constructor(public connection: MongoClient, public db: Db) {}
 
   /**
-   * Register a new player with both better-auth and GrowServer player data
+   * Get the next auto-incrementing UID for players
    */
-  public async register(options: {
-    username: string;
-    displayName: string;
-    email: string;
-    password: string;
-    role?: "admin" | "user";
-    emailVerified?: boolean;
+  private async getNextUID(): Promise<number> {
+    const counter = await CounterModel.findByIdAndUpdate(
+      "playerId",
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    return counter.seq;
+  }
+
+  /**
+   * Create a player for an existing user
+   */
+  public async createPlayerFromUser(userId: string, options?: {
+    displayName?: string;
     inventoryMax?: number;
   }) {
-    const {
-      username,
-      displayName,
-      email,
-      password,
-      role = "user",
-      emailVerified = false,
-      inventoryMax = 16,
-    } = options;
+    const { displayName, inventoryMax = 16 } = options || {};
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Get the user
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      throw new Error(`User with ID "${userId}" not found`);
+    }
 
-    // Check if user/player already exists
-    const existingPlayer = await PlayerModel.findOne({ name: username.toLowerCase() });
+    // Check if player already exists
+    const existingPlayer = await PlayerModel.findOne({ userId: new mongoose.Types.ObjectId(userId) });
     if (existingPlayer) {
-      throw new Error(`Player with username "${username}" already exists`);
+      throw new Error(`Player for user ID "${userId}" already exists`);
     }
 
-    const existingUser = await UserModel.findOne({ email });
-    if (existingUser) {
-      throw new Error(`User with email "${email}" already exists`);
-    }
+    // Get next UID
+    const uid = await this.getNextUID();
 
-    // Create player first
+    // Create player
     const player = await PlayerModel.create({
-      name:        username.toLowerCase(),
-      displayName: displayName,
-      password:    hashedPassword,
-      role:        role,
+      name:        user.username || user.name.toLowerCase().replace(/\s+/g, ""),
+      displayName: displayName || user.name,
+      role:        user.role || "user",
+      userId:      new mongoose.Types.ObjectId(userId),
+      uid:         uid,
       clothing:    {
         shirt:    0,
         pants:    0,
@@ -65,48 +64,40 @@ export class PlayerHandler {
         max:   inventoryMax,
         items: [],
       },
-    });
+    }) as PlayerDocument;
 
-    // Create better-auth user
-    const user = await UserModel.create({
-      name:          displayName,
-      email:         email,
-      emailVerified: emailVerified,
-      username:      username,
-      role:          role,
-      playerId:      player._id,
-    });
+    // Update user with playerId
+    await UserModel.findByIdAndUpdate(userId, { playerId: player._id });
 
-    // Link user to player
-    await PlayerModel.findByIdAndUpdate(player._id, { userId: user._id });
-
-    return {
-      user,
-      player,
-    };
+    return player;
   }
 
   /**
-   * Login a player with username and password
+   * Get or create a player for a user
+   * If the player doesn't exist, it will be created automatically
    */
-  public async login(username: string, password: string) {
-    const player = await PlayerModel.findOne({ name: username.toLowerCase() });
-    if (!player) {
-      throw new Error("Invalid username or password");
+  public async getOrCreatePlayer(userId: string, options?: {
+    name?: string;
+    displayName?: string;
+    inventoryMax?: number;
+  }) {
+    // Check if player already exists
+    const player = await PlayerModel.findOne({ userId: new mongoose.Types.ObjectId(userId) }) as PlayerDocument;
+    
+    if (player) {
+      return player;
     }
 
-    const isPasswordValid = await bcrypt.compare(password, player.password);
-    if (!isPasswordValid) {
-      throw new Error("Invalid username or password");
-    }
+    // Create player if it doesn't exist
+    return await this.createPlayerFromUser(userId, options);
+  }
 
-    // Get associated user
-    const user = await UserModel.findById(player.userId);
-
-    return {
-      player,
-      user,
-    };
+  /**
+   * Get a player by user ID
+   */
+  public async getByUserId(userId: string) {
+    const player = await PlayerModel.findOne({ userId: new mongoose.Types.ObjectId(userId) }).populate("userId");
+    return player;
   }
 
   /**
@@ -126,6 +117,14 @@ export class PlayerHandler {
   }
 
   /**
+   * Check if a player exists by user ID
+   */
+  public async existsByUserId(userId: string) {
+    const player = await PlayerModel.findOne({ userId: new mongoose.Types.ObjectId(userId) });
+    return !!player;
+  }
+
+  /**
    * Check if a player exists
    */
   public async exists(username: string) {
@@ -138,7 +137,6 @@ export class PlayerHandler {
    */
   public async update(username: string, data: {
     displayName?: string;
-    password?: string;
     role?: string;
     clothing?: {
       shirt?: number;
@@ -162,11 +160,6 @@ export class PlayerHandler {
     if (data.displayName) updateData.displayName = data.displayName;
     if (data.role) updateData.role = data.role;
 
-    if (data.password) {
-      const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(data.password, salt);
-    }
-
     if (data.clothing) {
       updateData.clothing = data.clothing;
     }
@@ -186,26 +179,6 @@ export class PlayerHandler {
     }
 
     return player;
-  }
-
-  /**
-   * Delete a player and associated user
-   */
-  public async delete(username: string) {
-    const player = await PlayerModel.findOne({ name: username.toLowerCase() });
-    if (!player) {
-      throw new Error(`Player with username "${username}" not found`);
-    }
-
-    // Delete associated user
-    if (player.userId) {
-      await UserModel.findByIdAndDelete(player.userId);
-    }
-
-    // Delete player
-    await PlayerModel.findByIdAndDelete(player._id);
-
-    return true;
   }
 
   /**

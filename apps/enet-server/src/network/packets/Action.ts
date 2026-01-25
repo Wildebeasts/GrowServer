@@ -10,8 +10,8 @@ import PlayerAuth from "../player/PlayerAuth";
 export default class Action {
   private playerAuth: PlayerAuth;
 
-  constructor(private server: Server, private database: Database, public buf: ExtendBuffer, public serverID: number, public netID: number, public channelID: number) {
-    this.playerAuth = new PlayerAuth(this.database);
+  constructor(private server: Server, public buf: ExtendBuffer, public serverID: number, public netID: number, public channelID: number) {
+    this.playerAuth = new PlayerAuth(this.server);
   }
 
 
