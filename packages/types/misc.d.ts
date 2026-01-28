@@ -16,10 +16,9 @@ export interface StringOptions {
 }
 
 export interface ItemsData {
-  hash: string;
+  hash: number;
   content: Buffer;
   metadata: ItemsDatMeta;
-  wiki: ItemsInfo[];
 }
 
 export interface Cache {

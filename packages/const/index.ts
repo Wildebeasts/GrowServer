@@ -31,6 +31,7 @@ export const WORLD_SIZE = {
 
 export enum PlatformID
 {
+    GT_WINDOWS = "0,1,1",
     UNKNOWN = -1,
     WINDOWS,
     IOS, //iPhone/iPad etc
@@ -46,6 +47,7 @@ export enum PlatformID
 
     //new platforms will be added above here.  Don't count on PLATFORM_ID_COUNT not changing!
     COUNT
+
 };
 
 export const STRING_CIPHER_KEY = "PBG892FXX982ABC*";

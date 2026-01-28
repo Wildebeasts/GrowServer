@@ -2,6 +2,7 @@ import { Database } from "@growserver/db";
 import { CommandManager } from "./CommandManager";
 import { EventManager } from "./EventManager";
 import { Server } from "./Server";
+import { items } from "./ItemsDB";
 
 export class Base {
   public servers: Server[];
@@ -10,6 +11,7 @@ export class Base {
     commands: new CommandManager(),
     events:   new EventManager()
   };
+
 
   constructor() {
     this.database = new Database(process.env.DATABASE_URL!, true);
@@ -20,6 +22,7 @@ export class Base {
   }
 
   public async init() {
+    await items.init();
     await this.database.setup();
     
     await this.manager.commands.init();

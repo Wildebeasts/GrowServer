@@ -86,7 +86,7 @@ export class RTTEX {
   public static hash(buf: Buffer): number {
     let hash = 0x55555555;
     buf.forEach((x) => (hash = (hash >>> 27) + (hash << 5) + x));
-    return hash >>> 0;
+    return hash;
   }
 
   public static async decode(rttexImg: Buffer): Promise<Buffer> {

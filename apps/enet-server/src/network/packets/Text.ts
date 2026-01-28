@@ -7,6 +7,8 @@ import PlayerAuth from "../player/PlayerAuth";
 import { Variant } from "growtopia.js";
 import { config } from "@growserver/config";
 import { customAlphabet } from "nanoid";
+import { items } from "@/core/ItemsDB";
+import { PlatformID } from "@growserver/const";
 
 export default class Text {
   private playerAuth: PlayerAuth;
@@ -22,7 +24,6 @@ export default class Text {
     const text: Record<string, string> = parseAction(this.buf.data);
     const peer = this.server.data.getPeerInstance(this.server, this.netID);
     if (!peer) return;
-    console.log(text);
 
     if (text.ltoken) {
       const ltoken = text.ltoken;
@@ -104,7 +105,94 @@ export default class Text {
     // 3. then uh, I forgot. I'll check that after all todo's are complete
 
     if (text.tankIDName && text.tankIDPass) {
-      // TODO: redirected checktoken and it has session token inside of tankIDPass
+
+      // As we store the token inside tankIDPass as the previous login above
+      const ltoken = text.tankIDPass;
+
+      const session = await this.playerAuth.validateToken(ltoken);
+
+      if (!session || !session?.user) {
+        return peer.send(
+          Variant.from(
+            "OnConsoleMessage",
+            "`4Session Expired`` It seems that this account already expired. try login again",
+          ),
+        );
+      }
+
+      const userId = session.user._id.toString();
+      const targetPeerData = this.server.data.peers.find((p) => p.data.userId === userId);
+      const isPlayerOnline = !!targetPeerData;
+      
+      if (isPlayerOnline) {
+        const targetPeer = this.server.data.getPeerInstance(this.server, targetPeerData.data.netID);
+        if (!targetPeer) return;
+
+        peer.send(
+          Variant.from(
+            "OnConsoleMessage",
+            "`4Already Logged In?`` It seems that this account already logged in by somebody else.",
+          ),
+        );
+
+        // targetPeer.leaveWorld(); // TODO: not yet
+        targetPeer.disconnect();
+      }
+
+      const ports = config.web.ports;
+      const randPort = ports[Math.floor(Math.random() * ports.length)];
+
+      const username = session.user.username;
+
+      if (!username) {
+        return peer.send(
+          Variant.from(
+            "OnConsoleMessage",
+            "`4Failed to create player data`` Username already taken, please try again later.",
+          ),
+        );
+      }
+      
+      // Get or create player data
+      const player = await this.server.database.player.getOrCreatePlayer(userId, {
+        displayName: username,
+        name:        username,
+      });
+
+      if (!player) {
+        return peer.send(
+          Variant.from(
+            "OnConsoleMessage",
+            "`4Failed to create player data`` Please try again later.",
+          ),
+        );
+      }
+
+      peer.send(
+        Variant.from("SetHasGrowID", 1, player.name, ltoken)
+      );
+
+
+      console.log({text});
+      // Send Supermain
+      const platformID = text.platformID;
+      // Temp using from windows
+      const itemsData = platformID === PlatformID.OSX.toString() ? items.data.windows : items.data.windows;
+      
+      peer.send(
+        Variant.from(
+          "OnSuperMainStartAcceptLogonHrdxs47254722215a",
+          itemsData.hash,
+          config.web.cdnUrl, // https://github.com/StileDevs/growserver-cache
+          "growtopia/",
+          config.server.antiCheat,
+          config.server.clientConf,
+          0, // player_tribute.dat hash,
+        ),
+      );
+
+      // Set peer data's
+      // this.database
     }
   }
 }

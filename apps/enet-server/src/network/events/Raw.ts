@@ -7,6 +7,8 @@ import type { Database } from "@growserver/db";
 import logger from "@growserver/logger";
 import { ExtendBuffer, parseAction } from "@growserver/utils";
 import Text from "../packets/Text";
+import Action from "../packets/Action";
+import Tank from "../packets/Tank";
 
 export default class EventRaw extends IEvent {
   public name: string = "raw";
@@ -17,7 +19,7 @@ export default class EventRaw extends IEvent {
   @Debug()
   @ThrowError("Failed to call Raw event")
   public async execute(serverID: number, server: Server, netID: number, channelID: number, data: Buffer) {
-    logger.info(`[S-${serverID}] client sending data:\n${data.toString("hex").match(/../g)?.join(" ")}`);
+    logger.debug(`[S-${serverID}] client sending data:\n${data.toString("hex").match(/../g)?.join(" ")}`);
 
     const buf = new ExtendBuffer(0);
     buf.data = data;
@@ -27,6 +29,14 @@ export default class EventRaw extends IEvent {
     switch (type) {
       case PacketTypes.TEXT: {
         new Text(server, buf, serverID, netID, channelID).execute();
+        break;
+      }
+      case PacketTypes.ACTION: {
+        new Action(server, buf, serverID, netID, channelID).execute();
+        break;
+      }
+      case PacketTypes.TANK: {
+        new Tank(server, buf, serverID, netID, channelID).execute();
         break;
       }
     }
