@@ -18,6 +18,13 @@ export default defineConfig({
     }
   },
 
+  redirects: {
+    "/player/growid/checktoken": {
+      status: 307,
+      destination: "/player/growid/validate/checktoken"
+    }
+  },
+
   integrations: [vue()],
 
   env: {

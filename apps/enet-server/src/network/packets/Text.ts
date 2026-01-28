@@ -22,6 +22,7 @@ export default class Text {
     const text: Record<string, string> = parseAction(this.buf.data);
     const peer = this.server.data.getPeerInstance(this.server, this.netID);
     if (!peer) return;
+    console.log(text);
 
     if (text.ltoken) {
       const ltoken = text.ltoken;

@@ -24,18 +24,38 @@ export const POST: APIRoute = async ({ request }) => {
 
     const db = await useDatabase();
 
-    // Verify the session token
-    const session = await db.auth.api.getSession({
-      headers: new Headers({
-        'cookie': `better-auth.session_token=${refreshToken}`
-      })
-    });
+    const sessionData = await db.models.Session.findOne({ token: refreshToken })
+      .populate({
+        path:     'userId',
+        model:    'User',
+        populate: {
+          path:  'playerId',
+          model: 'Player'
+        }
+      });
 
-    if (!session?.session || !session?.user) {
+
+
+    if (!sessionData) {
       return new Response(
         JSON.stringify({
           success: false,
           error: "Invalid or expired session",
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    if (new Date(sessionData.expiresAt) < new Date()) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Session has expired",
         }),
         {
           status: 401,
