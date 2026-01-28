@@ -4,17 +4,48 @@ import { Debug, ThrowError } from "@/decorators";
 import logger from "@growserver/logger";
 import { ExtendBuffer, parseAction } from "@growserver/utils";
 import PlayerAuth from "../player/PlayerAuth";
-import { Variant } from "growtopia.js";
+import { TextPacket, Variant } from "growtopia.js";
 import { config } from "@growserver/config";
 import { customAlphabet } from "nanoid";
 import { items } from "@/core/ItemsDB";
-import { PlatformID } from "@growserver/const";
+import { PacketTypes, PlatformID } from "@growserver/const";
 
 export default class Text {
   private playerAuth: PlayerAuth;
 
   constructor(private server: Server, public buf: ExtendBuffer, public serverID: number, public netID: number, public channelID: number) {
     this.playerAuth = new PlayerAuth(this.server);
+  }
+
+  @Debug()
+  @ThrowError("Failed to check version")
+  private async checkVersion(text: Record<string, string>) {
+    const peer = this.server.data.getPeerInstance(this.server, this.netID);
+    if (!peer) return;
+
+
+    if (
+      text.game_version &&
+      text.game_version !== items.cdn.version &&
+      config.server.bypassVersionCheck
+    ) {
+      peer.send(
+        TextPacket.from(
+          PacketTypes.ACTION,
+          "action|log",
+          `msg|\`4UPDATE REQUIRED!\`\` : The \`$V${items.cdn.version}\`\` update is now available for your device.  Go get it!  You'll need to install it before you can play online.`,
+        ),
+        TextPacket.from(
+          PacketTypes.ACTION,
+          "action|set_url",
+          `url|https://ubistatic-a.akamaihd.net/${items.cdn.uri}/GrowtopiaInstaller.exe`,
+          "label|Download Latest Version",
+        ),
+      );
+      peer.disconnect();
+      return;
+    }
+
   }
 
 
@@ -24,6 +55,7 @@ export default class Text {
     const text: Record<string, string> = parseAction(this.buf.data);
     const peer = this.server.data.getPeerInstance(this.server, this.netID);
     if (!peer) return;
+
 
     if (text.ltoken) {
       const ltoken = text.ltoken;
@@ -99,16 +131,9 @@ export default class Text {
       );
     }
 
-    // TODO: 
-    // 1. We're making OnSuperMain packet sending
-    // 2. Make a items dat building that seperate items.dat between others platform
-    // 3. then uh, I forgot. I'll check that after all todo's are complete
-
     if (text.tankIDName && text.tankIDPass) {
-
       // As we store the token inside tankIDPass as the previous login above
       const ltoken = text.tankIDPass;
-
       const session = await this.playerAuth.validateToken(ltoken);
 
       if (!session || !session?.user) {
@@ -119,6 +144,8 @@ export default class Text {
           ),
         );
       }
+
+      await this.checkVersion(text);
 
       const userId = session.user._id.toString();
       const targetPeerData = this.server.data.peers.find((p) => p.data.userId === userId);
@@ -168,28 +195,38 @@ export default class Text {
         );
       }
 
-      peer.send(
-        Variant.from("SetHasGrowID", 1, player.name, ltoken)
-      );
 
-
-      console.log({text});
       // Send Supermain
       const platformID = text.platformID;
-      // Temp using from windows
-      const itemsData = platformID === PlatformID.OSX.toString() ? items.data.windows : items.data.windows;
+      const itemsData = platformID === PlatformID.OSX.toString() ? items.data.get("darwin") : items.data.get("windows");
+
+      if (!itemsData) {
+        return peer.send(
+          Variant.from(
+            "OnConsoleMessage",
+            "`4Server Error`` Items data not loaded. Please try again.",
+          ),
+        );
+      }
+
+      
+      // TODO:
+      // INI KENAPA DAH WOI HASH NYA AJA DAH BENER
+      const superMainVariant = Variant.from(
+        "OnSuperMainStartAcceptLogonHrdxs47254722215a",
+        itemsData.hash,
+        config.web.cdnUrl, // https://github.com/StileDevs/growserver-cache
+        "growtopia/",
+        config.server.antiCheat,
+        config.server.clientConf,
+        0, // player_tribute.dat hash,
+      );
       
       peer.send(
-        Variant.from(
-          "OnSuperMainStartAcceptLogonHrdxs47254722215a",
-          itemsData.hash,
-          config.web.cdnUrl, // https://github.com/StileDevs/growserver-cache
-          "growtopia/",
-          config.server.antiCheat,
-          config.server.clientConf,
-          0, // player_tribute.dat hash,
-        ),
+        superMainVariant,
+        Variant.from("SetHasGrowID", 1, player.name, ltoken)
       );
+      
 
       // Set peer data's
       // this.database

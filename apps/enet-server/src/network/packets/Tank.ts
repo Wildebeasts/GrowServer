@@ -19,7 +19,15 @@ export default class Tank {
   public async execute() {
     const tank = TankPacket.fromBuffer(this.buf.data);
     const tankType = tank.data?.type as TankTypes;
+    const tankTypeName = TankTypes[tankType];
 
-    console.log({tank});
+    const peer = this.server.data.getPeerInstance(this.server, this.netID);
+    if (!peer) return;
+
+    logger.info({ tank, tankTypeName });
+
+    // Temp
+    if (tankType === TankTypes.DISCONNECT) peer.disconnect();
+
   }
 }

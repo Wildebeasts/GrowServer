@@ -6,34 +6,43 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { ItemsDat, type ItemsDatMeta } from "grow-items";
 
+// Use global to persist data across hot reloads
+declare global {
+   
+  var __itemsDB__: {
+    cdn: CDNContent;
+    data: Collection<string, ItemsData>;
+    wiki: ItemsInfo[];
+    initialized: boolean;
+  } | undefined;
+}
+
 class ItemsDB {
   public cdn = { version: "", uri: "0000/0000", itemsDatName: "" };
-  public data: {
-    wiki: ItemsInfo[];
-    windows: ItemsData;
-    darwin: ItemsData;
-  } = {
-    wiki:    [],
-    windows: {
-      content:  Buffer.alloc(0),
-      hash:     0,
-      metadata: {} as ItemsDatMeta,
-    },
-    darwin: {
-      content:  Buffer.alloc(0),
-      hash:     0,
-      metadata: {} as ItemsDatMeta,
-    }
-  };
+  public data = new Collection<string, ItemsData>();
+  public wiki: ItemsInfo[] = [];
 
   private path = join(__dirname, "..", "..", ".cache", "growtopia", "dat");
   private initialized = false;
 
-  constructor() {}
+  constructor() {
+    // Restore data from global if it exists
+    if (global.__itemsDB__) {
+      this.cdn = global.__itemsDB__.cdn;
+      this.data = global.__itemsDB__.data;
+      this.wiki = global.__itemsDB__.wiki;
+      this.initialized = global.__itemsDB__.initialized;
+      logger.info("[ItemsDB] Restored from global cache");
+    }
+  }
 
   public async init() {
-    if (this.initialized) return;
+    if (this.initialized) {
+      logger.info("[ItemsDB] Already initialized, skipping...");
+      return;
+    }
 
+    logger.info("[ItemsDB] Starting initialization...");
     this.cdn = await this.getLatestCDN();
     await downloadItemsDat(this.cdn.itemsDatName);
     await this.parse();
@@ -41,26 +50,41 @@ class ItemsDB {
 
     // TODO: wiki down here
 
-
     this.initialized = true;
+    
+    // Store in global to persist across hot reloads
+    global.__itemsDB__ = {
+      cdn:         this.cdn,
+      data:        this.data,
+      wiki:        this.wiki,
+      initialized: this.initialized,
+    };
+    
+    logger.info("[ItemsDB] Initialization complete!");
   }
 
 
   private async parse(platform: PlatformID = PlatformID.GT_WINDOWS) {
     if (platform === PlatformID.OSX) {
-      // TODO: lets focus on windows for now
       const content = await this.getItemsDat();
       const itemsDat = new ItemsDat(Array.from(content));
 
       await itemsDat.decode();
 
-      this.data.darwin = {
+      const darwinData: ItemsData = {
         content,
         hash:     RTTEX.hash(content),
         metadata: itemsDat.meta,
       };
 
-      logger.info(`[ItemsDB] MacOS items data hash: ${this.data.darwin.hash}`);
+      this.data.set("darwin", darwinData);
+
+      // Update global cache
+      if (global.__itemsDB__) {
+        global.__itemsDB__.data = this.data;
+      }
+
+      logger.info(`[ItemsDB] MacOS items data hash: ${darwinData.hash}`);
       logger.info("[ItemsDB] Successfully parsing macos items data");
     } else {
       const content = await this.getItemsDat();
@@ -68,13 +92,20 @@ class ItemsDB {
 
       await itemsDat.decode();
 
-      this.data.windows = {
+      const windowsData: ItemsData = {
         content,
         hash:     RTTEX.hash(content),
         metadata: itemsDat.meta,
       };
 
-      logger.info(`[ItemsDB] Windows items data hash: ${this.data.windows.hash}`);
+      this.data.set("windows", windowsData);
+
+      // Update global cache
+      if (global.__itemsDB__) {
+        global.__itemsDB__.data = this.data;
+      }
+
+      logger.info(`[ItemsDB] Windows items data hash: ${windowsData.hash}`);
       logger.info("[ItemsDB] Successfully parsing windows items data");
 
     }

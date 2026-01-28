@@ -20,11 +20,7 @@ export default class Action {
   public async execute() {
     const text: Record<string, string> = parseAction(this.buf.data);
 
-    const ltoken = text.ltoken;
+    logger.info({action: text});
 
-    if (ltoken) {
-      const session = await this.playerAuth.validateToken(ltoken);
-      logger.info({session, ltoken});
-    }
   }
 }
