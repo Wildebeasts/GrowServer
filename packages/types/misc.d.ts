@@ -10,6 +10,7 @@ export interface CDNContent {
   itemsDatName: string;
 }
 
+
 export interface StringOptions {
   id?: number;
   encoded?: boolean;
@@ -20,6 +21,12 @@ export interface ItemsData {
   content: Buffer;
   metadata: ItemsDatMeta;
 }
+
+export interface PlayerTribute {
+  hash: number;
+  content: Buffer;
+  metadata: Record<string, string>;
+};
 
 export interface Cache {
   peers: Collection<number, PeerData>;

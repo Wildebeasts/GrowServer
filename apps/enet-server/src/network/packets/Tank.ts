@@ -24,10 +24,14 @@ export default class Tank {
     const peer = this.server.data.getPeerInstance(this.server, this.netID);
     if (!peer) return;
 
-    logger.info({ tank, tankTypeName });
+    // logger.info({ tank, tankTypeName });
+
+    // logger.info(`[S-${this.serverID}] client sending data:\n${this.buf.data.toString("hex").match(/../g)?.join(" ")}`);
 
     // Temp
-    if (tankType === TankTypes.DISCONNECT) peer.disconnect();
+    if (tankType === TankTypes.DISCONNECT) {
+      peer.disconnect();
+    }
 
   }
 }

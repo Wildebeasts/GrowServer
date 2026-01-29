@@ -1,6 +1,6 @@
 import { ITEMS_DAT_FETCH_URL, PlatformID } from "@growserver/const";
 import logger from "@growserver/logger";
-import type { CDNContent, ItemsData, ItemsInfo } from "@growserver/types";
+import type { CDNContent, ItemsData, ItemsInfo, PlayerTribute } from "@growserver/types";
 import { Collection, downloadItemsDat, fetchJSON, RTTEX } from "@growserver/utils";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -8,11 +8,11 @@ import { ItemsDat, type ItemsDatMeta } from "grow-items";
 
 // Use global to persist data across hot reloads
 declare global {
-   
   var __itemsDB__: {
     cdn: CDNContent;
     data: Collection<string, ItemsData>;
     wiki: ItemsInfo[];
+    playerTribute: PlayerTribute;
     initialized: boolean;
   } | undefined;
 }
@@ -21,8 +21,14 @@ class ItemsDB {
   public cdn = { version: "", uri: "0000/0000", itemsDatName: "" };
   public data = new Collection<string, ItemsData>();
   public wiki: ItemsInfo[] = [];
+  public playerTribute: PlayerTribute = {
+    hash:     0,
+    content:  Buffer.alloc(0),
+    metadata: {}
+  };
 
-  private path = join(__dirname, "..", "..", ".cache", "growtopia", "dat");
+  private rootPath = join(__dirname, "..", "..");
+  private path = join(this.rootPath, ".cache", "growtopia", "dat");
   private initialized = false;
 
   constructor() {
@@ -31,6 +37,7 @@ class ItemsDB {
       this.cdn = global.__itemsDB__.cdn;
       this.data = global.__itemsDB__.data;
       this.wiki = global.__itemsDB__.wiki;
+      this.playerTribute = global.__itemsDB__.playerTribute;
       this.initialized = global.__itemsDB__.initialized;
       logger.info("[ItemsDB] Restored from global cache");
     }
@@ -48,16 +55,25 @@ class ItemsDB {
     await this.parse();
     await this.parse(PlatformID.OSX);
 
+    // Player tribute
+    const tribute = await this.getPlayerTribute();
+    this.playerTribute = {
+      content:  tribute,
+      hash:     RTTEX.hash(tribute),
+      metadata: {}
+    };
+
     // TODO: wiki down here
 
     this.initialized = true;
     
     // Store in global to persist across hot reloads
     global.__itemsDB__ = {
-      cdn:         this.cdn,
-      data:        this.data,
-      wiki:        this.wiki,
-      initialized: this.initialized,
+      cdn:           this.cdn,
+      data:          this.data,
+      wiki:          this.wiki,
+      playerTribute: this.playerTribute,
+      initialized:   this.initialized,
     };
     
     logger.info("[ItemsDB] Initialization complete!");
@@ -109,6 +125,10 @@ class ItemsDB {
       logger.info("[ItemsDB] Successfully parsing windows items data");
 
     }
+  }
+
+  private async getPlayerTribute() {
+    return await readFile(join(this.rootPath, "assets", "player_tribute.dat")) as Buffer;
   }
 
   private async getItemsDat() {

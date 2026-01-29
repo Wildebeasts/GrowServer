@@ -165,6 +165,33 @@ export class ServerData {
   }
 
   /**
+   * Modify specific properties of a cached peer
+   */
+  @Debug()
+  public modifyPeer(netID: number, modifications: Partial<PeerData>): boolean {
+    const entry = this.peers.get(netID);
+    
+    if (!entry) {
+      logger.warn(`Cannot modify peer ${netID}: not found in cache`);
+      return false;
+    }
+
+    // Check if entry has expired
+    if (this.isExpired(entry)) {
+      this.peers.delete(netID);
+      logger.warn(`Cannot modify peer ${netID}: entry expired`);
+      return false;
+    }
+
+    // Update properties
+    entry.data = { ...entry.data, ...modifications };
+    entry.lastAccessed = Date.now();
+    
+    logger.debug(`Modified peer ${netID} properties`);
+    return true;
+  }
+
+  /**
    * Delete a peer from cache
    */
   @Debug()
@@ -238,6 +265,33 @@ export class ServerData {
     };
 
     this.worlds.set(worldName, entry);
+  }
+
+  /**
+   * Modify specific properties of a cached world
+   */
+  @Debug()
+  public modifyWorld(worldName: string, modifications: Partial<WorldData>): boolean {
+    const entry = this.worlds.get(worldName);
+    
+    if (!entry) {
+      logger.warn(`Cannot modify world ${worldName}: not found in cache`);
+      return false;
+    }
+
+    // Check if entry has expired
+    if (this.isExpired(entry)) {
+      this.worlds.delete(worldName);
+      logger.warn(`Cannot modify world ${worldName}: entry expired`);
+      return false;
+    }
+
+    // Update properties
+    entry.data = { ...entry.data, ...modifications };
+    entry.lastAccessed = Date.now();
+    
+    logger.debug(`Modified world ${worldName} properties`);
+    return true;
   }
 
   /**

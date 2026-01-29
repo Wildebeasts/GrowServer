@@ -78,6 +78,7 @@ const playerSchema = new Schema({
   role:        { type: String, required: true },
   userId:      { type: Schema.Types.ObjectId, ref: "User" },
   uid:         { type: Number, required: true },
+  gems:        { type: Number, required: true },
   clothing:    {
     shirt:    { type: Number, required: true, default: 0 },
     pants:    { type: Number, required: true, default: 0 },

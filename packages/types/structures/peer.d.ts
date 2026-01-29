@@ -11,6 +11,7 @@ export interface PeerData {
   country: string;
   platformID?: string;
   userId: string;
+  uid: number;
   role: string;
   gems: number;
   clothing: Clothing;

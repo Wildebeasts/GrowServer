@@ -56,7 +56,8 @@ export default class Text {
     const peer = this.server.data.getPeerInstance(this.server, this.netID);
     if (!peer) return;
 
-
+  
+    // logger.info({text, buffer: this.buf.data.toString("hex").match(/../g)?.join(" ")});
     if (text.ltoken) {
       const ltoken = text.ltoken;
       const session = await this.playerAuth.validateToken(ltoken);
@@ -210,26 +211,94 @@ export default class Text {
       }
 
       
-      // TODO:
-      // INI KENAPA DAH WOI HASH NYA AJA DAH BENER
-      const superMainVariant = Variant.from(
-        "OnSuperMainStartAcceptLogonHrdxs47254722215a",
-        itemsData.hash,
-        config.web.cdnUrl, // https://github.com/StileDevs/growserver-cache
-        "growtopia/",
-        config.server.antiCheat,
-        config.server.clientConf,
-        0, // player_tribute.dat hash,
+      const superMainVariant = Variant.from({
+        netID: -1,
+        delay: 0,
+      },
+      "OnSuperMainStartAcceptLogonHrdxs47254722215a",
+      itemsData.hash,
+      config.web.cdnUrl, // https://github.com/StileDevs/growserver-cache
+      "growtopia/",
+      config.server.antiCheat,
+      config.server.clientConf,
+      0, // player_tribute.dat hash,
       );
+
       
       peer.send(
         superMainVariant,
-        Variant.from("SetHasGrowID", 1, player.name, ltoken)
+        Variant.from("SetHasGrowID", 1, player.name, ltoken),
       );
       
 
       // Set peer data's
-      // this.database
+
+      const defaultInventory = {
+        max:   32,
+        items: [
+          {
+            id:     18, // Fist
+            amount: 1,
+          },
+          {
+            id:     32, // Wrench
+            amount: 1,
+          },
+        ],
+      };
+
+      const defaultClothing = {
+        hair:     0,
+        shirt:    0,
+        pants:    0,
+        feet:     0,
+        face:     0,
+        hand:     0,
+        back:     0,
+        mask:     0,
+        necklace: 0,
+        ances:    0,
+      };
+
+      this.server.data.modifyPeer(this.netID, {
+        world:     "",
+        inventory: {
+          max:   0,
+          items: []
+        },
+        rotatedLeft: false,
+        name:        player.name,
+        displayName: player.displayName,
+        country:     "us", // temp
+        userId:      "",
+        uid:         0,
+        role:        "",
+        gems:        0,
+        clothing:    {
+          shirt:    0,
+          pants:    0,
+          feet:     0,
+          face:     0,
+          hand:     0,
+          back:     0,
+          hair:     0,
+          mask:     0,
+          necklace: 0,
+          ances:    0
+        },
+        exp:   0,
+        level: 0,
+        state: {
+          mod:             0,
+          canWalkInBlocks: false,
+          modsEffect:      0,
+          lava:            {
+            damage:       0,
+            resetStateAt: 0
+          },
+          isGhost: false
+        }
+      });
     }
   }
 }

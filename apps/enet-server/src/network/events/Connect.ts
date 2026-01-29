@@ -28,9 +28,10 @@ export default class EventConnect extends IEvent {
       rotatedLeft: false,
       name:        "",
       displayName: "",
-      netID:       0,
+      netID,
       country:     "",
-      userID:      0,
+      userId:      "",
+      uid:         0,
       role:        "",
       gems:        0,
       clothing:    {
