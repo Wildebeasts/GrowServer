@@ -309,9 +309,14 @@ export function formatToDisplayName(name: string, role: string): string {
       return `\`e${name}\`\``;
     }
     case ROLE.DEVELOPER: {
-      return `\`b@${name}\`\``;
+      return `\`5@${name}\`\``;
     }
   }
+}
+
+/** Strips all GT color codes (e.g. `w `5 ``) and leading @ from a display name, returning the plain name. */
+export function stripDisplayName(displayName: string): string {
+  return displayName.replace(/`[\w#^$@!~]{0,2}/g, "").replace(/^@+/, "");
 }
 
 export async function getLatestItemsDatName() {

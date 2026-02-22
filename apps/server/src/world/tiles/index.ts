@@ -14,45 +14,49 @@ import { SwitcheROO } from "./SwitcheROO";
 import { WeatherTile } from "./WeatherTile";
 import { DiceTile } from "./DiceTile";
 import { SeedTile } from "./SeedTile";
+import { JammerTile } from "./JammerTile";
+import { MagplantTile } from "./MagplantTile";
 import { ExtendBuffer } from "@growserver/utils";
 import { TankPacket } from "growtopia.js";
-import logger from "@growserver/logger";
 
 const TileMap: Record<number, Class<Tile>> = {
-  [ActionTypes.DOOR]:            DoorTile,
-  [ActionTypes.MAIN_DOOR]:       DoorTile,
-  [ActionTypes.PORTAL]:          DoorTile,
-  [ActionTypes.SIGN]:            SignTile,
-  [ActionTypes.LOCK]:            LockTile,
-  [ActionTypes.HEART_MONITOR]:   HeartMonitorTile,
-  [ActionTypes.DISPLAY_BLOCK]:   DisplayBlockTile,
-  [ActionTypes.SWITCHEROO]:      SwitcheROO,
+  [ActionTypes.DOOR]: DoorTile,
+  [ActionTypes.MAIN_DOOR]: DoorTile,
+  [ActionTypes.PORTAL]: DoorTile,
+  [ActionTypes.SIGN]: SignTile,
+  [ActionTypes.LOCK]: LockTile,
+  [ActionTypes.HEART_MONITOR]: HeartMonitorTile,
+  [ActionTypes.DISPLAY_BLOCK]: DisplayBlockTile,
+  [ActionTypes.SWITCHEROO]: SwitcheROO,
   [ActionTypes.WEATHER_MACHINE]: WeatherTile,
-  [ActionTypes.DICE]:            DiceTile,
-  [ActionTypes.BACKGROUND]:      NormalTile,
-  [ActionTypes.FOREGROUND]:      NormalTile,
-  [ActionTypes.SEED]:            SeedTile,
+  [ActionTypes.DICE]: DiceTile,
+  [ActionTypes.BACKGROUND]: NormalTile,
+  [ActionTypes.FOREGROUND]: NormalTile,
+  [ActionTypes.SEED]: SeedTile,
+  [ActionTypes.JAMMER]: JammerTile,
 };
 
 // constructs a new Tile subclass based on the ActionType.
 // if itemType is not specified, it will get the item type from data.fg.
 //  otherwise, it will use the provided itemType. (Only usesd to bootstrap itemType)
+/** Item IDs that are always handled by MagplantTile regardless of items.dat type.
+ *  Only the placed block (5638) — NOT the seed (5639), which must go through SeedTile. */
+const MAGPLANT_ITEM_IDS = new Set([5638]);
+
 const tileFrom = (
   base: Base,
   world: World,
   data: TileData,
   itemType?: ActionTypes,
 ) => {
-  const type =
-    itemType ?? base.items.metadata.items.get(data.fg.toString())!.type!;
-  try {
-    const tile = new TileMap[type](base, world, data);
-    return tile;
-  } catch (e) {
-    logger.debug(e);
-
-    return new NormalTile(base, world, data);
+  if (MAGPLANT_ITEM_IDS.has(data.fg)) {
+    return new MagplantTile(base, world, data);
   }
+  const itemMeta = base.items.metadata.items.get(data.fg.toString());
+  const type =
+    itemType ?? (itemMeta?.type as ActionTypes) ?? ActionTypes.FOREGROUND;
+  const TileClass = TileMap[type] ?? NormalTile;
+  return new TileClass(base, world, data);
 };
 
 //TOOD: Move this to appropriate place.

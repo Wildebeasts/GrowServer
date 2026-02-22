@@ -1,7 +1,7 @@
 import { PeerData } from "./structures/peer";
 import { WorldData } from "./structures/world";
 import { Collection, CooldownOptions } from "./index";
-import { ItemsDatMeta } from "grow-items";
+import { ItemsDatMeta, ItemDefinition } from "grow-items";
 import { ItemsInfo } from "./structures/item-pages";
 
 export interface CDNContent {
@@ -17,8 +17,14 @@ export interface StringOptions {
 
 export interface ItemsData {
   hash: string;
+  rawHash: string;
   content: Buffer;
-  metadata: ItemsDatMeta;
+  rawContent: Buffer;
+  // Override items map to accept both number and string keys (grow-items v1.3.2 uses number
+  // keys internally, but the server normalizes them to string keys at load time).
+  metadata: Omit<ItemsDatMeta, "items"> & {
+    items: import("grow-items").Collection<number | string, ItemDefinition>;
+  };
   wiki: ItemsInfo[];
 }
 
@@ -26,6 +32,7 @@ export interface Cache {
   peers: Collection<number, PeerData>;
   worlds: Collection<string, WorldData>;
   cooldown: Collection<string, CooldownOptions>;
+  pendingPasswords: Map<number, string>;
 }
 
 export interface MipMap {

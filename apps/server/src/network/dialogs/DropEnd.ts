@@ -32,6 +32,18 @@ export class DropEnd {
       return;
     }
     const itemID = parseInt(this.action.itemID);
+
+    // Magplant Remote cannot be dropped or traded
+    if (itemID === 5640 || itemID === 5641) {
+      this.peer.send(
+        Variant.from(
+          "OnConsoleMessage",
+          "This item cannot be dropped or traded.",
+        ),
+      );
+      return;
+    }
+
     const count = parseInt(this.action.drop_count);
     const itemExist = this.peer.data?.inventory?.items.find(
       (i) => i.id === itemID,

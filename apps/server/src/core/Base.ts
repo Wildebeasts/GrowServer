@@ -30,7 +30,6 @@ import { World } from "./World";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import chokidar from "chokidar";
 import ky from "ky";
-import { ITEMS_DAT_FETCH_URL } from "@growserver/const";
 import { ItemsDat, ItemsDatMeta } from "grow-items";
 import { config as configServer } from "@growserver/config";
 import logger from "@growserver/logger";
@@ -49,7 +48,7 @@ export class Base {
   constructor() {
     this.server = new Client({
       enet: {
-        ip:                 "0.0.0.0",
+        ip: "0.0.0.0",
         useNewServerPacket: true,
       },
     });
@@ -59,15 +58,18 @@ export class Base {
     this.config = configServer;
     this.cdn = { version: "", uri: "0000/0000", itemsDatName: "" };
     this.items = {
-      content:  Buffer.alloc(0),
-      hash:     "",
+      content: Buffer.alloc(0),
+      rawContent: Buffer.alloc(0),
+      hash: "",
+      rawHash: "",
       metadata: {} as ItemsDatMeta,
-      wiki:     [],
+      wiki: [],
     };
     this.cache = {
-      peers:    new Collection(),
-      worlds:   new Collection(),
+      peers: new Collection(),
+      worlds: new Collection(),
       cooldown: new Collection(),
+      pendingPasswords: new Map<number, string>(),
     };
 
     this.database = new Database();
@@ -97,12 +99,15 @@ export class Base {
       const datDir = join(__dirname, ".cache", "growtopia", "dat");
       const datName = join(datDir, this.cdn.itemsDatName);
       const itemsDat = readFileSync(datName);
+      const rawHash = RTTEX.hash(itemsDat);
 
       this.items = {
-        hash:     `${RTTEX.hash(itemsDat)}`,
-        content:  itemsDat,
+        hash: `${rawHash}`,
+        rawHash: `${rawHash}`,
+        content: itemsDat,
+        rawContent: itemsDat,
         metadata: {} as ItemsDatMeta,
-        wiki:     [] as ItemsInfo[],
+        wiki: [] as ItemsInfo[],
       };
 
       logger.info(`Starting ENet server on port ${port}`);
@@ -295,6 +300,17 @@ export class Base {
     this.items.hash = `${hash}`;
     this.items.metadata = itemsDat.meta;
 
+    // grow-items v1.3.2 uses integer keys; normalize to string keys so all
+    // existing .get(id.toString()) calls continue to work.
+    const normalizedItems = new (Object.getPrototypeOf(
+      itemsDat.meta.items,
+    ).constructor)();
+    for (const [k, v] of itemsDat.meta.items) {
+      normalizedItems.set(String(k), v);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.items.metadata.items = normalizedItems as any;
+
     const wikiFile = await readFile(
       join(__dirname, "assets", "items_info_new.json"),
       "utf-8",
@@ -310,20 +326,17 @@ export class Base {
       const cdnData = (await fetchJSON(
         "https://mari-project.jad.li/api/v1/growtopia/cache/latest",
       )) as CDNContent;
-      const itemsDat = (await fetchJSON(ITEMS_DAT_FETCH_URL)) as {
-        content: string;
-      };
 
       const data: CDNContent = {
-        version:      cdnData.version,
-        uri:          cdnData.uri,
-        itemsDatName: itemsDat.content,
+        version: "5.42",
+        uri: cdnData.uri,
+        itemsDatName: "items-v5.42.dat",
       };
 
       return data;
     } catch (e) {
       logger.error(`Failed to get latest CDN: ${e}`);
-      return { version: "", uri: "", itemsDatName: "" };
+      return { version: "5.42", uri: "", itemsDatName: "items-v5.42.dat" };
     }
   }
 

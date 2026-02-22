@@ -30,8 +30,8 @@ export class RefreshItemData {
       );
       itemsContent = readFileSync(join(datDir, macosItemsDatName));
     } else {
-      // Use regular items.dat already loaded in memory
-      itemsContent = this.base.items.content;
+      // Use raw items.dat (not re-encoded) so hash matches CDN file
+      itemsContent = this.base.items.rawContent;
     }
 
     this.peer.send(

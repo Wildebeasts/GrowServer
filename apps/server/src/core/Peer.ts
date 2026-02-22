@@ -388,25 +388,27 @@ export class Peer extends OldPeer<PeerData> {
     if (data)
       this.data = {
         channelID,
-        x:                 data.x,
-        y:                 data.y,
-        world:             data.world,
-        inventory:         data.inventory,
-        rotatedLeft:       data.rotatedLeft,
-        name:              data.name,
-        displayName:       data.displayName,
+        x: data.x,
+        y: data.y,
+        world: data.world,
+        inventory: data.inventory,
+        rotatedLeft: data.rotatedLeft,
+        name: data.name,
+        displayName: data.displayName,
         netID,
-        country:           data.country,
-        userID:            data.userID,
-        role:              data.role,
-        gems:              data.gems,
-        clothing:          data.clothing,
-        exp:               data.exp,
-        level:             data.level,
-        lastCheckpoint:    data.lastCheckpoint,
+        country: data.country,
+        userID: data.userID,
+        role: data.role,
+        gems: data.gems,
+        clothing: data.clothing,
+        exp: data.exp,
+        level: data.level,
+        lastCheckpoint: data.lastCheckpoint,
         lastVisitedWorlds: data.lastVisitedWorlds,
-        state:             data.state,
-        heartMonitors:     data.heartMonitors,
+        state: data.state,
+        heartMonitors: data.heartMonitors,
+        loggedIn: data.loggedIn,
+        platformID: data.platformID,
       };
   }
 
@@ -614,6 +616,7 @@ export class Peer extends OldPeer<PeerData> {
 
   public leaveWorld() {
     if (!this.data.world) return;
+    // Clear chat access interval
     const world = this.currentWorld();
     world?.leave(this);
   }
@@ -650,8 +653,8 @@ export class Peer extends OldPeer<PeerData> {
     if (this.data.inventory?.items.find((i) => i.id === id)?.amount !== 0) {
       const tank = TankPacket.from({
         packetType: 4,
-        type:       TankTypes.MODIFY_ITEM_INVENTORY,
-        info:       id,
+        type: TankTypes.MODIFY_ITEM_INVENTORY,
+        info: id,
         buildRange: amount < 0 ? amount * -1 : undefined,
         punchRange: amount < 0 ? undefined : amount,
       }).parse() as Buffer;
@@ -875,16 +878,16 @@ export class Peer extends OldPeer<PeerData> {
     // Use punchID if provided, otherwise use getPunchID()
     const punch = punchID !== undefined ? punchID : this.getPunchID();
     const tank = TankPacket.from({
-      type:   TankTypes.SET_CHARACTER_STATE,
-      netID:  this.data.netID,
-      info:   this.data.state.mod,
-      xPos:   1200,
-      yPos:   200,
+      type: TankTypes.SET_CHARACTER_STATE,
+      netID: this.data.netID,
+      info: this.data.state.mod,
+      xPos: 1200,
+      yPos: 200,
       xSpeed: 300,
       ySpeed: 600,
       xPunch: 0,
       yPunch: 0,
-      state:  0,
+      state: 0,
     }).parse() as Buffer;
 
     tank.writeUint8(punch, 5);

@@ -33,10 +33,10 @@ export class World {
       this.data = data;
     } else
       this.data = {
-        name:    "",
-        width:   0,
-        height:  0,
-        blocks:  [],
+        name: "",
+        width: 0,
+        height: 0,
+        blocks: [],
         weather: { id: 41 },
         dropped: { items: [], uid: 0 },
       };
@@ -112,6 +112,7 @@ add_floater|START1|0|0.5|3529161471
 add_floater|START2|0|0.5|3529161471
 ${Array.from(this.base.cache.worlds.values())
   .sort((a, b) => (b.playerCount || 0) - (a.playerCount || 0))
+  .filter((v) => !v.jammers?.some((j) => j.type === "signal" && j.enabled))
   .slice(0, 6)
   .map((v) => {
     if (v.playerCount)
@@ -149,23 +150,55 @@ ${peer.data.lastVisitedWorlds
     if (!this.base.cache.worlds.has(this.worldName)) {
       const world = await this.base.database.worlds.get(this.worldName);
       if (world) {
+        const parsedBlocks = world.blocks
+          ? JSON.parse(world.blocks.toString())
+          : [];
+        const rebuiltJammers: {
+          type: "signal" | "punch" | "zombie";
+          enabled: boolean;
+        }[] = [];
+        const jammerIdMap: Record<number, "signal" | "punch" | "zombie"> = {
+          226: "signal",
+          1276: "punch",
+          1278: "zombie",
+        };
+        for (const block of parsedBlocks) {
+          const jammerType = jammerIdMap[block.fg];
+          if (jammerType && block.flags & TileFlags.OPEN) {
+            if (!rebuiltJammers.find((j) => j.type === jammerType)) {
+              rebuiltJammers.push({ type: jammerType, enabled: true });
+            }
+          }
+        }
+        // Rebuild magplantTileIndices from block data so collectViaMagplant
+        // works after a server restart / DB reload.
+        const rebuiltMagplantIndices: number[] = [];
+        for (let i = 0; i < parsedBlocks.length; i++) {
+          if (parsedBlocks[i].fg === 5638 && parsedBlocks[i].magplant) {
+            rebuiltMagplantIndices.push(i);
+          }
+        }
+
         this.data = {
-          name:        world.name,
-          width:       world.width,
-          height:      world.height,
-          blocks:      world.blocks ? JSON.parse(world.blocks.toString()) : [],
+          name: world.name,
+          width: world.width,
+          height: world.height,
+          blocks: parsedBlocks,
           // admins: [],
           playerCount: 0,
-          jammers:     [],
-          dropped:     world.dropped
+          jammers: rebuiltJammers,
+          dropped: world.dropped
             ? JSON.parse(world.dropped.toString())
             : { uid: 0, items: [] },
           // owner: world.owner ? JSON.parse(world.owner.toString()) : null,
-          weather:        { id: world.weather_id || 41 },
+          weather: { id: world.weather_id || 41 },
           worldLockIndex: world.worldlock_index
             ? world.worldlock_index
             : undefined,
           // minLevel: world.minimum_level || 1,
+          magplantTileIndices: rebuiltMagplantIndices.length
+            ? rebuiltMagplantIndices
+            : undefined,
         };
       } else {
         await this.generate(true);
@@ -238,44 +271,17 @@ ${peer.data.lastVisitedWorlds
     buffer.writeUint32LE(this.data.height, 12 + this.worldName.length);
     buffer.writeUint32LE(blockCount, 16 + this.worldName.length);
 
-    console.log(
-      "Header bytes:",
-      buffer.slice(0, Math.min(20, buffer.length)).toString("hex"),
-    );
-
     // Tambahan 5 bytes, gatau ini apaan
     const unk1 = Buffer.alloc(5);
     // For 5.34, these bytes might matter - try setting to 0
     unk1.fill(0);
 
-    // Block data
-    const blockBytes: number[] = [];
-
-    try {
-      for (const block of this.data.blocks) {
-        // const item = this.base.items.metadata.items.find(
-        //   (i) => i.id === block.fg
-        // );
-
-        // const blockBuf = new Tile(this.base, this, block).serialize(item?.type as number);
-        // const type = item?.type as number;
-        // const blockBuf = await tileParse(type, this.base, this, block);
-        const blockBuf = (await tileFrom(this.base, this, block).parse()).data;
-
-        blockBuf.forEach((b) => blockBytes.push(b));
-      }
-
-      // Log first block for debugging
-      if (blockBytes.length > 0) {
-        console.log(
-          "First block data (first 32 bytes):",
-          Buffer.from(blockBytes.slice(0, 32)).toString("hex"),
-        );
-      }
-    } catch (error) {
-      console.error("Error serializing blocks:", error);
-      throw error;
+    // Block data — serialize all blocks sequentially
+    const blockBuffers: Buffer[] = [];
+    for (const block of this.data.blocks) {
+      blockBuffers.push((await tileFrom(this.base, this, block).parse()).data);
     }
+    const blockBytes = Buffer.concat(blockBuffers);
 
     // Tambahan 12 bytes, gatau ini apaan
     const unk2 = Buffer.alloc(12);
@@ -309,14 +315,14 @@ ${peer.data.lastVisitedWorlds
 
     const worldMap = Buffer.concat([
       buffer,
-      Buffer.concat([unk1, Buffer.from(blockBytes)]),
+      Buffer.concat([unk1, blockBytes]),
       Buffer.concat([unk2, dropData, weatherData]),
     ]);
 
     const tank = TankPacket.from({
-      type:  TankTypes.SEND_MAP_DATA,
+      type: TankTypes.SEND_MAP_DATA,
       state: 8,
-      data:  () => worldMap,
+      data: () => worldMap,
     });
 
     const mainDoor = this.data.blocks.find((block) => block.fg === 6);
@@ -325,7 +331,7 @@ ${peer.data.lastVisitedWorlds
     const yPos = (y < 0 ? mainDoor?.y || 0 : y) * 32;
 
     peer.send(tank);
-    // Applly current weather on join
+    // Apply current weather on join
     peer.send(Variant.from("OnSetCurrentWeather", this.data.weather.id));
     peer.data.x = xPos;
     peer.data.y = yPos;
@@ -335,7 +341,7 @@ ${peer.data.lastVisitedWorlds
       Variant.from(
         { delay: -1 },
         "OnSpawn",
-        `spawn|avatar\nnetID|${peer.data?.netID}\nuserID|${peer.data?.userID}\ncolrect|0|0|20|30\nposXY|${peer.data?.x}|${peer.data?.y}\nname|\`w${peer.data.displayName}\`\`\ncountry|${peer.country}\ninvis|0\nmstate|0\nsmstate|0\nonlineID|\ntype|local`,
+        `spawn|avatar\nnetID|${peer.data?.netID}\nuserID|${peer.data?.userID}\ncolrect|0|0|20|30\nposXY|${peer.data?.x}|${peer.data?.y}\nname|${peer.data.displayName}\ncountry|${peer.country}\ninvis|0\nmstate|0\nsmstate|0\nonlineID|\ntype|local`,
       ),
 
       Variant.from(
@@ -364,15 +370,51 @@ ${peer.data.lastVisitedWorlds
     );
 
     const ownerUserID = this.getOwnerUID();
+    const othersHere = this.data.playerCount ?? 0;
+    const totalOnline = this.base.getPlayersOnline();
+
     if (ownerUserID) {
       const ownerData = await this.base.database.players.getByUID(ownerUserID);
       peer.send(
-        Variant.from(
-          "OnConsoleMessage",
-          `\`p[\`0${this.data.name} \`oWorld Locked by ${ownerData?.display_name}\`#]`,
+        TextPacket.from(
+          PacketTypes.ACTION,
+          `action|log`,
+          "msg|CP:0_PL:0_OID:_CT:[W]_ `p[`0" +
+            this.data.name +
+            " `oWorld Locked by " +
+            (ownerData?.display_name ?? "???") +
+            "`p]",
         ),
       );
     }
+
+    const jammerBuffs: string[] = [];
+    const seenJammerTypes = new Set<number>();
+    for (const block of this.data.blocks) {
+      if (!(block.flags & TileFlags.OPEN)) continue;
+      if (block.fg === 226 && !seenJammerTypes.has(226)) {
+        jammerBuffs.push("`4JAMMED");
+        seenJammerTypes.add(226);
+      } else if (block.fg === 1276 && !seenJammerTypes.has(1276)) {
+        jammerBuffs.push("`2NOPUNCH");
+        seenJammerTypes.add(1276);
+      } else if (block.fg === 1278 && !seenJammerTypes.has(1278)) {
+        jammerBuffs.push("`2IMMUNE");
+        seenJammerTypes.add(1278);
+      }
+    }
+    const buffSuffix =
+      jammerBuffs.length > 0
+        ? " `0[``" + jammerBuffs.join("``" + ", `0") + "``" + "`0]``"
+        : "";
+
+    peer.send(
+      TextPacket.from(
+        PacketTypes.ACTION,
+        `action|log`,
+        `msg|CP:0_PL:0_OID:_CT:[W]_ World \`w${this.data.name}\`\`${buffSuffix} entered. There are \`w${othersHere}\`\` other people here, \`w${totalOnline.toLocaleString()}\`\` online.`,
+      ),
+    );
 
     const world = peer.currentWorld();
     if (world) {
@@ -382,7 +424,7 @@ ${peer.data.lastVisitedWorlds
             Variant.from(
               { delay: -1 },
               "OnSpawn",
-              `spawn|avatar\nnetID|${peer.data?.netID}\nuserID|${peer.data?.userID}\ncolrect|0|0|20|30\nposXY|${peer.data?.x}|${peer.data?.y}\nname|\`w${peer.data.displayName}\`\`\ncountry|${peer.country}\ninvis|0\nmstate|0\nsmstate|0\nonlineID|\n`,
+              `spawn|avatar\nnetID|${peer.data?.netID}\nuserID|${peer.data?.userID}\ncolrect|0|0|20|30\nposXY|${peer.data?.x}|${peer.data?.y}\nname|${peer.data.displayName}\ncountry|${peer.country}\ninvis|0\nmstate|0\nsmstate|0\nonlineID|\n`,
             ),
             Variant.from(
               {
@@ -430,7 +472,7 @@ ${peer.data.lastVisitedWorlds
             Variant.from(
               { delay: -1 },
               "OnSpawn",
-              `spawn|avatar\nnetID|${p.data?.netID}\nuserID|${p.data?.userID}\ncolrect|0|0|20|30\nposXY|${p.data?.x}|${p.data?.y}\nname|\`w${p.data.displayName}\`\`\ncountry|${p.country}\ninvis|0\nmstate|0\nsmstate|0\nonlineID|\n`,
+              `spawn|avatar\nnetID|${p.data?.netID}\nuserID|${p.data?.userID}\ncolrect|0|0|20|30\nposXY|${p.data?.x}|${p.data?.y}\nname|${p.data.displayName}\ncountry|${p.country}\ninvis|0\nmstate|0\nsmstate|0\nonlineID|\n`,
             ),
             Variant.from(
               {
@@ -485,14 +527,21 @@ ${peer.data.lastVisitedWorlds
     amount: number,
     { tree, noSimilar }: { tree?: boolean; noSimilar?: boolean } = {},
   ) {
+    // Magplant auto-collection: intercept tree drops before they hit the ground
+    if (tree && id > 1) {
+      const consumed = this.collectViaMagplant(id, amount);
+      if (consumed >= amount) return;
+      amount -= consumed;
+    }
+
     const tank = TankPacket.from({
-      type:        TankTypes.ITEM_CHANGE_OBJECT,
-      netID:       -1,
+      type: TankTypes.ITEM_CHANGE_OBJECT,
+      netID: -1,
       targetNetID: tree ? -1 : peer.data?.netID,
-      state:       0,
-      info:        id,
-      xPos:        x,
-      yPos:        y,
+      state: 0,
+      info: id,
+      xPos: x,
+      yPos: y,
     });
 
     const position = Math.trunc(x / 32) + Math.trunc(y / 32) * this.data.width;
@@ -501,11 +550,11 @@ ${peer.data.lastVisitedWorlds
     const similarDrops = noSimilar
       ? null
       : this.data.dropped?.items
-        .filter(
-          (i) =>
-            i.id === id && block.x === i.block.x && block.y === i.block.y,
-        )
-        .sort((a, b) => a.amount - b.amount);
+          .filter(
+            (i) =>
+              i.id === id && block.x === i.block.x && block.y === i.block.y,
+          )
+          .sort((a, b) => a.amount - b.amount);
 
     const similarDrop = Array.isArray(similarDrops) ? similarDrops[0] : null;
 
@@ -534,7 +583,7 @@ ${peer.data.lastVisitedWorlds
         amount,
         x,
         y,
-        uid:   ++this.data.dropped.uid,
+        uid: ++this.data.dropped.uid,
         block: { x: block.x, y: block.y },
       });
 
@@ -570,10 +619,10 @@ ${peer.data.lastVisitedWorlds
       world.every((p) => {
         p.send(
           TankPacket.from({
-            type:        TankTypes.ITEM_CHANGE_OBJECT,
-            netID:       peer.data?.netID,
+            type: TankTypes.ITEM_CHANGE_OBJECT,
+            netID: peer.data?.netID,
             targetNetID: -1,
-            info:        uid,
+            info: uid,
           }),
         );
       });
@@ -592,7 +641,7 @@ ${peer.data.lastVisitedWorlds
 
         this.drop(peer, droppedItem.x, droppedItem.y, droppedItem.id, extra, {
           noSimilar: true,
-          tree:      true,
+          tree: true,
         });
       } else {
         if (droppedItem.id !== 112) {
@@ -627,6 +676,32 @@ ${peer.data.lastVisitedWorlds
 
     peer.saveToCache();
     this.saveToCache();
+  }
+
+  /**
+   * Scan all placed Magplant 5000 blocks in this world and let them
+   * absorb matching items. Returns the total number of items consumed.
+   */
+  public collectViaMagplant(itemID: number, amount: number): number {
+    const indices = this.data.magplantTileIndices;
+    if (!indices || indices.length === 0) return 0;
+
+    let consumed = 0;
+    for (const idx of indices) {
+      if (consumed >= amount) break;
+      const block = this.data.blocks[idx];
+      if (!block?.magplant) continue;
+      if (!block.magplant.enabled) continue;
+      if (block.magplant.targetItemID !== itemID) continue;
+
+      const space = 5000 - block.magplant.storedAmount;
+      if (space <= 0) continue;
+
+      const take = Math.min(amount - consumed, space);
+      block.magplant.storedAmount += take;
+      consumed += take;
+    }
+    return consumed;
   }
 
   public async hasTilePermission(

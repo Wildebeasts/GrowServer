@@ -23,10 +23,24 @@ export interface TileData {
   dice?: Dice;
   provider?: Provider;
   displayBlock?: DisplayBlock;
+  magplant?: Magplant;
 }
 
 export interface Provider {
   date: number;
+}
+
+export interface Magplant {
+  /** userID of the player who placed this magplant */
+  ownerUserID: number;
+  /** Item ID this magplant is set to collect (0 = not configured) */
+  targetItemID: number;
+  /** Current amount stored (max 5000) */
+  storedAmount: number;
+  /** Whether auto-collection is enabled */
+  enabled: boolean;
+  /** Whether building mode is active (place from storage via remote) */
+  buildingMode: boolean;
 }
 
 export interface Mannequin {
@@ -89,6 +103,8 @@ export interface WorldData {
   worldLockIndex?: number;
   // minLevel: number;
   // openToPublic?: boolean;
+  /** Tile indices (x + y*width) of all placed Magplant 5000 blocks in this world */
+  magplantTileIndices?: number[];
 }
 // export interface WorldOwnerData {
 //   name: string;

@@ -7,8 +7,10 @@ import {
   ActionTypes,
   BlockFlags,
   LOCKS,
+  LockPermission,
   ROLE,
   TankTypes,
+  TileFlags,
 } from "@growserver/const";
 import { ItemDefinition } from "grow-items";
 import { tileFrom } from "../../world/tiles";
@@ -56,6 +58,10 @@ export class TileChangeReq {
     } else if (this.tank.data?.info === 32) {
       await tileFrom(this.base, this.world, tileData).onWrench(this.peer);
     }
+    // Magplant Remote — place the stored item from the magplant's storage
+    else if (this.tank.data?.info === 5640 || this.tank.data?.info === 5641) {
+      await this.handleMagplantRemote(tileData);
+    }
     // Others
     else {
       const itemMeta = this.base.items.metadata.items.get(
@@ -88,6 +94,112 @@ export class TileChangeReq {
     }
     await this.world.saveToCache();
     await this.world.saveToDatabase();
+  }
+
+  /**
+   * Handle Magplant 5000 Remote placement.
+   * Instead of placing the remote itself, find the magplant in building mode
+   * and place the stored item from its storage.
+   */
+  private async handleMagplantRemote(tileData: TileData): Promise<void> {
+    // The remote must NOT be consumed — it stays in inventory.
+    // Look up the specific magplant this remote is linked to.
+    const link = this.peer.data.magplantLink;
+    if (!link || link.world !== this.world.worldName) {
+      this.peer.sendTextBubble(
+        "This remote isn't linked to a Magplant in this world!",
+        true,
+      );
+      return;
+    }
+
+    const magplantBlock = this.world.data.blocks[link.tileIndex];
+    if (!magplantBlock?.magplant || magplantBlock.fg !== 5638) {
+      this.peer.sendTextBubble(
+        "The linked Magplant 5000 no longer exists!",
+        true,
+      );
+      this.peer.data.magplantLink = undefined;
+      return;
+    }
+
+    if (!magplantBlock.magplant.buildingMode) {
+      this.peer.sendTextBubble(
+        "Building mode is disabled on the linked Magplant. Punch it to activate!",
+        true,
+      );
+      return;
+    }
+
+    if (
+      magplantBlock.magplant.targetItemID <= 0 ||
+      magplantBlock.magplant.storedAmount <= 0
+    ) {
+      this.peer.sendTextBubble(
+        "The linked Magplant 5000 has no items stored!",
+        true,
+      );
+      return;
+    }
+
+    const mp = magplantBlock.magplant;
+    const storedItemMeta = this.base.items.metadata.items.get(
+      mp.targetItemID.toString(),
+    );
+    if (!storedItemMeta) return;
+
+    // Check tile permission
+    if (
+      !(await this.world.hasTilePermission(
+        this.peer.data.userID,
+        tileData,
+        LockPermission.BUILD,
+      ))
+    ) {
+      return;
+    }
+
+    // Place on empty tile
+    if (tileData.fg === 0) {
+      if (storedItemMeta.type === ActionTypes.BACKGROUND) {
+        // Place as background from storage
+        tileData.bg = storedItemMeta.id!;
+        if (!tileData.fg) tileData.damage = 0;
+      } else {
+        // Place as foreground from storage
+        tileData.fg = storedItemMeta.id!;
+        tileData.damage = 0;
+        tileData.resetStateAt = 0;
+        tileData.flags = tileData.flags & (TileFlags.LOCKED | TileFlags.WATER);
+
+        if (storedItemMeta.flags! & BlockFlags.MULTI_FACING) {
+          if (this.peer.data.rotatedLeft) tileData.flags |= TileFlags.FLIPPED;
+        }
+      }
+    } else if (storedItemMeta.type === ActionTypes.BACKGROUND) {
+      // Place as background on occupied foreground
+      tileData.bg = storedItemMeta.id!;
+    } else {
+      // Foreground already occupied
+      this.peer.sendTextBubble("There's already something there!", true);
+      return;
+    }
+
+    // Deduct 1 from magplant storage
+    mp.storedAmount -= 1;
+
+    // Broadcast the tile change
+    const tank = TankPacket.from({
+      type: TankTypes.TILE_CHANGE_REQUEST,
+      xPunch: tileData.x,
+      yPunch: tileData.y,
+      info: storedItemMeta.id!,
+      state: tileData.flags & TileFlags.FLIPPED ? 0x10 : 0,
+    });
+
+    this.world.every((p) => {
+      p.send(tank);
+    });
   }
 
   // private async onTileWrench() {

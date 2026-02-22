@@ -57,11 +57,11 @@ export class Tile {
     }
 
     const tank = TankPacket.from({
-      type:   TankTypes.TILE_CHANGE_REQUEST,
+      type: TankTypes.TILE_CHANGE_REQUEST,
       xPunch: this.data.x,
       yPunch: this.data.y,
-      info:   this.data.fg,
-      state:  this.data.flags & TileFlags.FLIPPED ? 0x10 : 0, // set the rotateLeft flag
+      info: this.data.fg,
+      state: this.data.flags & TileFlags.FLIPPED ? 0x10 : 0, // set the rotateLeft flag
     });
 
     this.world.every((p) => {
@@ -119,10 +119,10 @@ export class Tile {
     if (!this.data.fg) this.data.damage = 0;
 
     const tank = TankPacket.from({
-      type:   TankTypes.TILE_CHANGE_REQUEST,
+      type: TankTypes.TILE_CHANGE_REQUEST,
       xPunch: this.data.x,
       yPunch: this.data.y,
-      info:   this.data.bg,
+      info: this.data.bg,
     });
 
     this.world.every((p) => {
@@ -334,8 +334,8 @@ export class Tile {
     this.onDrop(peer, destroyedItemID);
 
     const tank = TankPacket.from({
-      type:   TankTypes.TILE_CHANGE_REQUEST,
-      info:   18,
+      type: TankTypes.TILE_CHANGE_REQUEST,
+      info: 18,
       xPunch: this.data.x,
       yPunch: this.data.y,
     });
@@ -354,18 +354,18 @@ export class Tile {
     if (itemMeta.flags! & BlockFlags.PERMANENT) {
       const objectID = ++this.world.data.dropped.uid;
       const dropPkt = new TankPacket({
-        type:        TankTypes.ITEM_CHANGE_OBJECT,
-        netID:       -1,
+        type: TankTypes.ITEM_CHANGE_OBJECT,
+        netID: -1,
         targetNetID: -1,
-        info:        destroyedItemID,
-        xPos:        this.data.x * 32,
-        yPos:        this.data.y * 32,
+        info: destroyedItemID,
+        xPos: this.data.x * 32,
+        yPos: this.data.y * 32,
       });
       const collectPkt = new TankPacket({
-        type:        TankTypes.ITEM_CHANGE_OBJECT,
-        netID:       peer.data.netID,
+        type: TankTypes.ITEM_CHANGE_OBJECT,
+        netID: peer.data.netID,
         targetNetID: -1,
-        info:        objectID,
+        info: objectID,
       });
       this.world.every((p) => {
         p.send(dropPkt, collectPkt);
@@ -380,7 +380,7 @@ export class Tile {
     // https://www.growtopiagame.com/forums/forum/general/guidebook/284860-beastly-s-calculator-hub/page12
     const rand = Math.random();
     if (rand <= 0.11) {
-      // 1/9 chance
+      // 1/9 chance — block drop
       this.world.drop(
         peer,
         this.data.x * 32 + Math.floor(Math.random() * 16),
@@ -388,10 +388,10 @@ export class Tile {
         itemMeta.id!,
         1,
         { tree: true },
-      ); // block
+      );
       return;
     } else if (rand <= 0.33) {
-      // 2/9 chance
+      // 2/9 chance — seed drop
       if (itemMeta.flags! & BlockFlags.SEEDLESS) return;
       this.world.drop(
         peer,
@@ -400,7 +400,7 @@ export class Tile {
         itemMeta.id! + 1,
         1,
         { tree: true },
-      ); // seed
+      );
       return;
     } else if (!(itemMeta.flags2! & BlockFlags2.GEMLESS)) {
       // check if it is not GEMLESS
@@ -558,10 +558,10 @@ export class Tile {
 
     peer.send(
       TankPacket.from({
-        type:   TankTypes.SEND_TILE_UPDATE_DATA,
+        type: TankTypes.SEND_TILE_UPDATE_DATA,
         xPunch: this.data.x,
         yPunch: this.data.y,
-        data:   () => serializedData.data,
+        data: () => serializedData.data,
       }),
     );
   }

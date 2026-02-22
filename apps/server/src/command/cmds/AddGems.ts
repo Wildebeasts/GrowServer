@@ -19,11 +19,11 @@ export default class AddGems extends Command {
       command: ["addgems"],
       description:
         "Add gems to a user. Use /username for exact name or #id for user ID.",
-      cooldown:   5,
-      ratelimit:  1,
-      category:   "`oBasic",
-      usage:      "/addgems <target> <amount>",
-      example:    ["/addgems /testuser1 10000", "/addgems #172 10000"],
+      cooldown: 5,
+      ratelimit: 1,
+      category: "`oBasic",
+      usage: "/addgems <target> <amount>",
+      example: ["/addgems /testuser1 10000", "/addgems #172 10000"],
       permission: [ROLE.DEVELOPER],
     };
   }
@@ -125,9 +125,10 @@ export default class AddGems extends Command {
     // Add gems to the target user
     if (targetPeer) {
       // User is online
-      const oldGems = targetPeer.data.gems;
-      targetPeer.data.gems += amount;
+      const oldGems = Number(targetPeer.data.gems) || 0;
+      targetPeer.data.gems = oldGems + amount;
       targetPeer.setGems(targetPeer.data.gems);
+      await targetPeer.saveToCache();
       await targetPeer.saveToDatabase();
 
       this.peer.send(

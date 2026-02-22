@@ -16,16 +16,21 @@ async function init() {
   });
 
   app.post("/growtopia/server_data.php", (ctx) => {
-    let str = "";
-
-    str += `server|${config.web.address}\n`;
-
     const randPort =
       config.web.ports[Math.floor(Math.random() * config.web.ports.length)];
 
-    str += `port|${randPort}\nloginurl|${config.web.loginUrl}\ntype|1\n${config.web.maintenance.enable ? "maint" : "#maint"}|
-      ${config.web.maintenance.message}
-      \ntype2|1\nmeta|ignoremeta\nRTENDMARKERBS1001`;
+    const str = [
+      `server|${config.web.address}`,
+      `port|${randPort}`,
+      `loginurl|${config.web.loginUrl}`,
+      `type|1`,
+      config.web.maintenance.enable
+        ? `maint|${config.web.maintenance.message}`
+        : `#maint|${config.web.maintenance.message}`,
+      `type2|1`,
+      `meta|ignoremeta`,
+      `RTENDMARKERBS1001`,
+    ].join("\n");
 
     return ctx.body(str);
   });

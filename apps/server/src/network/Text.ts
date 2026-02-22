@@ -1,7 +1,12 @@
 import { TextPacket, Variant } from "growtopia.js";
 import { Base } from "../core/Base";
 import { Peer } from "../core/Peer";
-import { parseAction, getCurrentTimeInSeconds, RTTEX } from "@growserver/utils";
+import {
+  parseAction,
+  getCurrentTimeInSeconds,
+  RTTEX,
+  formatToDisplayName,
+} from "@growserver/utils";
 import { PacketTypes } from "@growserver/const";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -25,12 +30,14 @@ export class ITextPacket {
   public async execute() {
     if (this.obj.action) return;
 
-    logger.debug(`[DEBUG] Receive text packet:\n ${this.obj}`);
-
     await this.checkVersion();
+
+    // Log ALL fields for both login paths to find what differs
+    logger.info(`[TEXT-ALL] ${JSON.stringify(this.obj)}`);
+
     if (this.obj.ltoken) await this.validateLtoken();
 
-    if (this.obj.tankIDName && this.obj.tankIDPass) {
+    if (this.obj.user && this.obj.token) {
       await this.validateRefreshToken();
     }
   }
@@ -89,8 +96,12 @@ export class ITextPacket {
       const macosItemsDat = readFileSync(join(datDir, macosItemsDatName));
       itemsHash = `${RTTEX.hash(macosItemsDat)}`;
     } else {
-      itemsHash = this.base.items.hash;
+      itemsHash = this.base.items.rawHash;
     }
+
+    logger.info(
+      `[SUPERMAIN] Sending hash=${itemsHash} cdnUrl=${this.base.config.web.cdnUrl} itemsDatName=${this.base.cdn.itemsDatName}`,
+    );
 
     return this.peer.send(
       Variant.from(
@@ -99,7 +110,7 @@ export class ITextPacket {
         this.base.config.web.cdnUrl, // https://github.com/StileDevs/growserver-cache
         "growtopia/",
         "cc.cz.madkite.freedom org.aqua.gg idv.aqua.bulldog com.cih.gamecih2 com.cih.gamecih com.cih.game_cih cn.maocai.gamekiller com.gmd.speedtime org.dax.attack com.x0.strai.frep com.x0.strai.free org.cheatengine.cegui org.sbtools.gamehack com.skgames.traffikrider org.sbtoods.gamehaca com.skype.ralder org.cheatengine.cegui.xx.multi1458919170111 com.prohiro.macro me.autotouch.autotouch com.cygery.repetitouch.free com.cygery.repetitouch.pro com.proziro.zacro com.slash.gamebuster",
-        "proto=216|choosemusic=audio/mp3/about_theme.mp3|active_holiday=6|wing_week_day=0|ubi_week_day=0|server_tick=638729041|clash_active=0|drop_lavacheck_faster=1|isPayingUser=0|usingStoreNavigation=1|enableInventoryTab=1|bigBackpack=1|",
+        `proto=225|choosemusic=audio/mp3/about_theme.mp3|active_holiday=6|wing_week_day=0|ubi_week_day=0|server_tick=${getCurrentTimeInSeconds()}|clash_active=0|drop_lavacheck_faster=1|isPayingUser=1|usingStoreNavigation=1|enableInventoryTab=1|bigBackpack=1|`,
         0, // player_tribute.dat hash,
       ),
     );
@@ -142,12 +153,21 @@ export class ITextPacket {
       const conf = this.base.config.web;
       const ports = conf.ports as number[];
       const randPort = ports[Math.floor(Math.random() * ports.length)];
+      const randomToken = Math.floor(Math.random() * (1000000 - 10000) + 10000);
+      this.base.cache.pendingPasswords.set(player.id, password);
+      logger.info(
+        `[LTOKEN] Stored pendingPassword for playerID=${player.id} name="${player.name}" token=${randomToken}`,
+      );
+
       this.peer.send(
         Variant.from("SetHasGrowID", 1, player.name, password),
+        Variant.from("OnOverrideGDPRFromServer", 18, 1, 0, 1),
+        Variant.from("SetHasGottenChatAccess", 1),
+        Variant.from("OnSetAccountAge", 9999),
         Variant.from(
           "OnSendToServer",
           randPort,
-          Math.random() * (1000000 - 10000) + 10000,
+          randomToken,
           player.id,
           `${conf.address}|0|${customAlphabet("0123456789ABCDEF", 32)()}`,
           1,
@@ -162,14 +182,32 @@ export class ITextPacket {
 
   private async validateRefreshToken() {
     try {
-      const growId = this.obj.tankIDName as string;
-      const password = this.obj.tankIDPass as string;
+      const userID = this.obj.user as string;
+      const tokenStr = this.obj.token as string;
 
-      const player = await this.base.database.players.get(growId.toLowerCase());
-      if (!player) throw new Error("Player not found");
+      // For quick login, the token is the JWT from checktoken response
+      // Try to extract the plaintext password from it
+      let plainPassword: string | undefined;
+      try {
+        const decoded = jwt.verify(
+          tokenStr,
+          process.env.JWT_SECRET as string,
+        ) as JsonObject;
+        if (decoded.password) {
+          plainPassword = decoded.password as string;
+          logger.info(
+            `[GROWID] Extracted plaintext password from JWT token for quick login`,
+          );
+        }
+      } catch {
+        // Token is not a JWT (it's a random numeric token from OnSendToServer redirect)
+        // Fall back to pendingPasswords cache set by validateLtoken
+      }
 
-      const isValid = await bcrypt.compare(password, player.password);
-      if (!isValid) throw new Error("Password are invalid");
+      const player = await this.base.database.players.getByUID(
+        parseInt(userID),
+      );
+      if (!player) throw new Error(`Player not found for userID=${userID}`);
 
       const targetPeerId = this.base.cache.peers.find(
         (v) => v.userID === player.id,
@@ -187,43 +225,67 @@ export class ITextPacket {
         targetPeer.disconnect();
       }
 
-      this.sendSuperMain();
-      this.peer.send(Variant.from("SetHasGrowID", 1, player.name, password));
+      // Send GDPR override BEFORE SuperMain — matches Gurotopia's tankIDName order
+      this.peer.send(Variant.from("OnOverrideGDPRFromServer", 18, 1, 0, 1));
+
+      await this.sendSuperMain();
+
+      // Priority: 1) JWT-decoded plaintext, 2) pendingPasswords from validateLtoken redirect, 3) bcrypt hash fallback
+      const pendingPw = this.base.cache.pendingPasswords.get(player.id);
+      const resolvedPassword = plainPassword ?? pendingPw ?? player.password;
+      const pwSource = plainPassword ? "jwt" : pendingPw ? "pending" : "hash";
+      this.base.cache.pendingPasswords.delete(player.id);
+
+      const playerAge = parseInt(this.obj.player_age as string) || 0;
+      const effectiveAge = 9999;
+
+      // OnOverrideGDPRFromServer was already sent before SuperMain (matches Gurotopia order)
+      this.peer.send(
+        Variant.from("SetHasGrowID", 1, player.name, resolvedPassword),
+        Variant.from("SetHasGottenChatAccess", 1),
+        Variant.from("OnSetAccountAge", effectiveAge),
+      );
+      logger.info(
+        `[GROWID] SetHasGrowID(1, "${player.name}") source=${pwSource} isHash=${resolvedPassword.startsWith("$2")} playerAge=${playerAge} effectiveAge=${effectiveAge} for userID=${userID}`,
+      );
 
       const defaultInventory = {
-        max:   32,
+        max: 32,
         items: [
           {
-            id:     18, // Fist
+            id: 18, // Fist
             amount: 1,
           },
           {
-            id:     32, // Wrench
+            id: 32, // Wrench
             amount: 1,
           },
         ],
       };
 
       const defaultClothing = {
-        hair:     0,
-        shirt:    0,
-        pants:    0,
-        feet:     0,
-        face:     0,
-        hand:     0,
-        back:     0,
-        mask:     0,
+        hair: 0,
+        shirt: 0,
+        pants: 0,
+        feet: 0,
+        face: 0,
+        hand: 0,
+        back: 0,
+        mask: 0,
         necklace: 0,
-        ances:    0,
+        ances: 0,
       };
 
       this.peer.data.name = player.name;
-      this.peer.data.displayName = player.display_name;
+      this.peer.data.role = player.role;
+      this.peer.data.displayName = formatToDisplayName(
+        player.display_name,
+        player.role,
+      );
       this.peer.data.rotatedLeft = false;
       this.peer.data.country = this.obj.country as string;
       this.peer.data.platformID = this.obj.platformID as string;
       this.peer.data.userID = player.id;
-      this.peer.data.role = player.role;
       this.peer.data.inventory = player.inventory?.length
         ? JSON.parse(player.inventory.toString())
         : defaultInventory;
@@ -242,12 +304,12 @@ export class ITextPacket {
       );
 
       this.peer.data.state = {
-        mod:             0,
+        mod: 0,
         canWalkInBlocks: false,
-        modsEffect:      0,
-        isGhost:         false,
-        lava:            {
-          damage:       0,
+        modsEffect: 0,
+        isGhost: false,
+        lava: {
+          damage: 0,
           resetStateAt: 0,
         },
       };

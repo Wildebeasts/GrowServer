@@ -4,6 +4,7 @@ import { players } from "../shared/schemas/Player";
 import bcrypt from "bcryptjs";
 import { ROLE } from "@growserver/const";
 import { PeerData } from "@growserver/types";
+import { stripDisplayName } from "@growserver/utils";
 
 export class PlayerDB {
   constructor(private db: PostgresJsDatabase<Record<string, never>>) {}
@@ -69,7 +70,7 @@ export class PlayerDB {
       .update(players)
       .set({
         name: data.name,
-        display_name: data.displayName,
+        display_name: stripDisplayName(data.displayName),
         role: data.role,
         inventory: JSON.stringify(data.inventory),
         clothing: JSON.stringify(data.clothing),

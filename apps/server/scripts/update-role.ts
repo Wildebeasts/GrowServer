@@ -1,39 +1,60 @@
-// DISABLED FOR NOW
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { players } from "../../../packages/db/shared/schemas/Player";
+import { eq } from "drizzle-orm";
+import { config } from "dotenv";
 
-// import { drizzle } from "drizzle-orm/libsql";
-// import { createClient } from "@libsql/client";
-// import { players } from "../src/database/schemas/Player";
-// import { eq } from "drizzle-orm";
-// import consola from "consola";
+config({ path: "../../.env" });
 
-// const username = process.argv[2];
-// const roleValue = process.argv[3] || "1"; // Default to DEVELOPER
+const ROLES: Record<string, string> = {
+  "1": "DEVELOPER",
+  "2": "BASIC",
+  "3": "SUPPORTER",
+};
 
-// if (!username) {
-//   consola.error("Please provide a username");
-//   consola.info("Usage: pnpm tsx scripts/update-role.ts <username> [role]");
-//   consola.info("Roles: 1=DEVELOPER, 2=BASIC, 3=SUPPORTER");
-//   process.exit(1);
-// }
+const username = process.argv[2];
+const roleValue = process.argv[3] || "1"; // Default to DEVELOPER
 
-// async function updateRole() {
-//   const sqlite = createClient({
-//     url: `file:data/data.db`
-//   });
-//   const db = drizzle(sqlite, { logger: false });
+if (!username) {
+  console.error("Please provide a username");
+  console.info("Usage: pnpm tsx scripts/update-role.ts <username> [role]");
+  console.info("Roles: 1=DEVELOPER, 2=BASIC, 3=SUPPORTER");
+  process.exit(1);
+}
 
-//   try {
-//     const result = await db
-//       .update(players)
-//       .set({ role: roleValue })
-//       .where(eq(players.name, username));
+if (!ROLES[roleValue]) {
+  console.error(`Invalid role: ${roleValue}`);
+  console.info("Roles: 1=DEVELOPER, 2=BASIC, 3=SUPPORTER");
+  process.exit(1);
+}
 
-//     consola.success(`Role updated to ${roleValue} for user: ${username}`);
-//     process.exit(0);
-//   } catch (error) {
-//     consola.error("Failed to update role:", error);
-//     process.exit(1);
-//   }
-// }
+async function updateRole() {
+  const connection = postgres(process.env.DATABASE_URL!);
+  const db = drizzle(connection, { logger: false });
 
-// updateRole();
+  try {
+    // Also reset display_name to plain name (strips any saved color codes)
+    const result = await db
+      .update(players)
+      .set({ role: roleValue, display_name: username })
+      .where(eq(players.name, username.toLowerCase()))
+      .returning({ id: players.id, name: players.name });
+
+    if (!result.length) {
+      console.error(`User "${username}" not found.`);
+      process.exit(1);
+    }
+
+    console.log(
+      `Role updated to ${ROLES[roleValue]} (${roleValue}) for user: ${username}`,
+    );
+    process.exit(0);
+  } catch (error) {
+    console.error("Failed to update role:", error);
+    process.exit(1);
+  } finally {
+    await connection.end();
+  }
+}
+
+updateRole();

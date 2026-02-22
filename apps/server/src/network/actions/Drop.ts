@@ -16,7 +16,7 @@ export class Drop {
     const itemID = parseInt(action.itemID);
 
     // Prevent dropping specific items add to the list if you want to prevent more items
-    if (itemID === 18 || itemID === 32) {
+    if (itemID === 18 || itemID === 32 || itemID === 5640 || itemID === 5641) {
       this.peer.send(
         Variant.from("OnConsoleMessage", "You'd be sorry if you lost that."),
       );

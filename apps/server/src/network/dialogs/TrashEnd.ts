@@ -54,7 +54,7 @@ export class TrashEnd {
       return;
     }
 
-    if (itemID === 18 || itemID === 32) {
+    if (itemID === 18 || itemID === 32 || itemID === 5640 || itemID === 5641) {
       this.peer.send(
         Variant.from(
           "OnTalkBubble",

@@ -228,6 +228,7 @@ export enum ActionTypes {
   CHECKPOINT = 27,
   SHEET_MUSIC = 28,
   ICE = 29,
+  JAMMER = 30,
   SWITCHEROO = 31,
   CHEST = 32,
   MAILBOX = 33,

@@ -17,15 +17,17 @@ export class IActionPacket {
 
   public async execute() {
     if (!this.obj.action) return;
-    logger.debug(`Receive action packet:\n ${this.obj}`);
+    logger.debug(`Receive action packet: ${JSON.stringify(this.obj)}`);
 
     const actionType = this.obj.action;
 
     try {
       const Class = ActionMap[actionType];
 
-      if (!Class)
-        throw new Error(`No Action class found with action name ${actionType}`);
+      if (!Class) {
+        logger.debug(`Unhandled action: ${actionType}`);
+        return;
+      }
 
       const action = new Class(this.base, this.peer);
       await action.execute(this.obj);

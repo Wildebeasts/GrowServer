@@ -7,6 +7,7 @@ import { World } from "../../core/World";
 import { tileFrom, tileUpdateMultiple } from "../../world/tiles";
 import { TileFlags } from "@growserver/const";
 import { HeartMonitorTile } from "../../world/tiles/HeartMonitorTile";
+import logger from "@growserver/logger";
 
 export class EnterGame {
   constructor(
@@ -28,7 +29,15 @@ export class EnterGame {
       .addQuickExit()
       .endDialog("gazzette_end", "Cancel", "Ok")
       .str();
+
+    logger.info(
+      `[ENTERGAME] peer.data.name="${this.peer.data.name}" enter_game received`,
+    );
+
     this.peer.send(
+      Variant.from("OnOverrideGDPRFromServer", 18, 1, 0, 1),
+      Variant.from("SetHasGottenChatAccess", 1),
+      Variant.from("OnSetAccountAge", 9999),
       Variant.from(
         "OnRequestWorldSelectMenu",
         `
@@ -38,6 +47,7 @@ add_floater|START1|0|0.5|3529161471
 add_floater|START2|0|0.5|3529161471
 ${Array.from(this.base.cache.worlds.values())
   .sort((a, b) => (b.playerCount || 0) - (a.playerCount || 0))
+  .filter((v) => !v.jammers?.some((j) => j.type === "signal" && j.enabled))
   .slice(0, 6)
   .map((v) => {
     if (v.playerCount)

@@ -19,7 +19,15 @@ export interface PeerData {
   lastCheckpoint?: CheckPoint;
   lastVisitedWorlds?: string[];
   state: PeerState;
-  heartMonitors: Map<string, Array<number>>; // A map that contains the world name as the key and the array number as the list of tile index.
+  heartMonitors: Map<string, Array<number>>;
+  loggedIn?: boolean;
+  /** Link to the Magplant 5000 this player's remote is tied to */
+  magplantLink?: {
+    /** World name where the linked magplant is placed */
+    world: string;
+    /** Block index (x + y * width) of the linked magplant */
+    tileIndex: number;
+  };
 }
 
 export interface PeerState {
