@@ -328,15 +328,15 @@ export class Base {
       )) as CDNContent;
 
       const data: CDNContent = {
-        version: "5.42",
+        version: "5.45",
         uri: cdnData.uri,
-        itemsDatName: "items-v5.42.dat",
+        itemsDatName: "items-v5.45.dat",
       };
 
       return data;
     } catch (e) {
       logger.error(`Failed to get latest CDN: ${e}`);
-      return { version: "5.42", uri: "", itemsDatName: "items-v5.42.dat" };
+      return { version: "5.45", uri: "", itemsDatName: "items-v5.45.dat" };
     }
   }
 
