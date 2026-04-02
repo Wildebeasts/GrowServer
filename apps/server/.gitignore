@@ -7,7 +7,6 @@ data
 assets/website/
 assets/build.zip
 build
-.cache
 data.db
 data
 
