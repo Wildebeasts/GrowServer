@@ -1,6 +1,6 @@
 const { ItemsDat } = require('./node_modules/.pnpm/grow-items@2.1.0/node_modules/grow-items/dist/index.js');
 const fs = require('fs');
-const buf = Array.from(fs.readFileSync('./apps/server/.cache/growtopia/dat/items-v5.42.dat'));
+const buf = Array.from(fs.readFileSync('./apps/server/.cache/growtopia/dat/items-v5.45.dat'));
 const dat = new ItemsDat(buf);
 dat.decode().then(() => {
   console.log('Item 0:', JSON.stringify(dat.meta.items.get('0')?.name));

@@ -176,6 +176,8 @@ ${peer.data.lastVisitedWorlds
         for (let i = 0; i < parsedBlocks.length; i++) {
           if (parsedBlocks[i].fg === 5638 && parsedBlocks[i].magplant) {
             rebuiltMagplantIndices.push(i);
+            // Ensure TILEEXTRA flag is set so the client reads the extra data.
+            parsedBlocks[i].flags |= TileFlags.TILEEXTRA;
           }
         }
 

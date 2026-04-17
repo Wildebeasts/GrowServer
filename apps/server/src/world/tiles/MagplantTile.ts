@@ -3,7 +3,12 @@ import type { Base } from "../../core/Base";
 import { Peer } from "../../core/Peer";
 import type { World } from "../../core/World";
 import type { TileData } from "@growserver/types";
-import { LockPermission, ROLE } from "@growserver/const";
+import {
+  LockPermission,
+  ROLE,
+  TileExtraTypes,
+  TileFlags,
+} from "@growserver/const";
 import { ExtendBuffer, DialogBuilder } from "@growserver/utils";
 import { Tile } from "../Tile";
 import { ItemDefinition } from "grow-items";
@@ -15,6 +20,8 @@ const MAGPLANT_MAX_STORAGE = 5000;
 const MAGPLANT_REMOTE_IDS = new Set([5640, 5641]);
 
 export class MagplantTile extends Tile {
+  public extraType = TileExtraTypes.MAGPLANT;
+
   constructor(
     public base: Base,
     public world: World,
@@ -46,6 +53,8 @@ export class MagplantTile extends Tile {
     itemMeta: ItemDefinition,
   ): Promise<boolean> {
     if (!(await super.onPlaceForeground(peer, itemMeta))) return false;
+
+    this.data.flags |= TileFlags.TILEEXTRA;
 
     this.data.magplant = {
       ownerUserID: peer.data.userID,
@@ -350,10 +359,15 @@ export class MagplantTile extends Tile {
 
   // ── serialization ──────────────────────────────────────────────────────────
 
-  // Magplant data is stored server-side only.
-  // Do NOT write any extra bytes here — the client only expects extra tile data
-  // when TileFlags.TILEEXTRA is set.  Writing extra bytes without that flag
-  // shifts every subsequent tile in the world packet, corrupting collision data
-  // and causing players to fall through all tiles after the magplant.
-  public async serialize(_dataBuffer: ExtendBuffer): Promise<void> {}
+  public async serialize(dataBuffer: ExtendBuffer): Promise<void> {
+    await super.serialize(dataBuffer);
+
+    const mp = this.data.magplant;
+    // extraType(u8) + targetItemID(u32) + storedAmount(u32) + remotesCount(u8)
+    dataBuffer.grow(10);
+    dataBuffer.writeU8(this.extraType);
+    dataBuffer.writeU32(mp?.targetItemID ?? 0);
+    dataBuffer.writeU32(mp?.storedAmount ?? 0);
+    dataBuffer.writeU8(0); // remotes count (not tracked server-side)
+  }
 }
