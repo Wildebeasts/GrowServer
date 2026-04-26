@@ -37,8 +37,8 @@ export class DoorTile extends Tile {
     this.data.flags |= TileFlags.TILEEXTRA | TileFlags.PUBLIC;
     this.data.door = {
       destination: "",
-      id:          "",
-      label:       "",
+      id: "",
+      label: "",
     };
 
     return true;
@@ -51,13 +51,17 @@ export class DoorTile extends Tile {
 
   public async serialize(dataBuffer: ExtendBuffer): Promise<void> {
     await super.serialize(dataBuffer);
-    const labelTotalSize = 2 + (this.data.door!.label ?? "").length;
+    const label = this.data.door?.label ?? "";
+
+    const labelTotalSize = 2 + label.length;
+
+    // GT 5.45 (world version 20) door format: extraType(1) + label(2+len) + doorFlag(1)
+    // dest/id are NOT part of the tile stream — they are handled via door metadata.
     dataBuffer.grow(1 + labelTotalSize + 1);
 
-    // using '!' because we are certain that it exists. Otherwise, crash.
     dataBuffer.writeU8(this.extraType);
-    dataBuffer.writeString(this.data.door!.label ?? "");
-    // 0x8 = Locked
+    await dataBuffer.writeString(label);
+    // 0x8 = Locked, 0x0 = public
     dataBuffer.writeU8(this.data.flags & TileFlags.PUBLIC ? 0x0 : 0x8);
   }
 

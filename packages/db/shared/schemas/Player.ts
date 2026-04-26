@@ -9,6 +9,7 @@ export const players = pgTable("players", {
   password: text("password").notNull(),
   role: text("role").notNull(),
   gems: integer("gems").default(0),
+  growtokens: integer("growtokens").default(0),
   level: integer("level").default(0),
   exp: integer("exp").default(0),
   clothing: text("clothing"),

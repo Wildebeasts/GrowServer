@@ -377,7 +377,7 @@ export class Base {
       let savedCount = 0;
       for (const [, peer] of this.cache.peers) {
         const player = new Peer(this, peer.netID);
-        await player.saveToDatabase();
+        await player.saveToDatabase().catch((e) => logger.error(`Failed saving peer ${peer.netID}:`, e));
         if (disconenctAll) {
           player.disconnect("now");
         }

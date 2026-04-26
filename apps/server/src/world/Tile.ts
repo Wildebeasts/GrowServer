@@ -199,11 +199,28 @@ export class Tile {
 
     // Check if player has Rayman's Fist equipped
     const hasRaymansFist = peer.data.clothing.hand === ITEM_RAYMANS_FIST;
+    const hasDiggersSpade = peer.data.clothing.hand === 2952;
 
     if (hasRaymansFist) {
       await this.handleRaymanPunch(peer);
     } else {
-      this.applyDamage(peer, 6);
+      let damageValue = 6; // Default punch damage
+      
+      if (hasDiggersSpade) {
+        if (itemMeta.id === 2 || itemMeta.id === 14) {
+          // Send 6 damage repeatedly until it breaks, so the client plays the block shattering debris effect properly
+          while ((this.data.damage || 0) < itemMeta.breakHits!) {
+            await this.applyDamage(peer, 6);
+          }
+          this.onDestroy(peer);
+          return true;
+        } else {
+          // Penalty: It takes significantly longer to break other blocks
+          damageValue = 2; 
+        }
+      }
+      
+      this.applyDamage(peer, damageValue);
 
       if (this.data.damage && this.data.damage >= itemMeta.breakHits!) {
         this.onDestroy(peer);
@@ -391,8 +408,9 @@ export class Tile {
       );
       return;
     } else if (rand <= 0.33) {
-      // 2/9 chance — seed drop
+      // 2/9 chance
       if (itemMeta.flags! & BlockFlags.SEEDLESS) return;
+
       this.world.drop(
         peer,
         this.data.x * 32 + Math.floor(Math.random() * 16),
@@ -473,31 +491,31 @@ export class Tile {
   }
 
   public async setParentTileIndex(tileIndex: number): Promise<number> {
-    return this.data.lockedBy
-      ? (this.data.lockedBy.parentX as number) +
-          (this.data.lockedBy.parentY as number) * this.world.data.width
-      : 0;
+    // Non-zero parentIdx is only valid for specific tile types (checkpoints, linked doors, etc.).
+    // Sending the lock position here for regular tiles (Dirt, Cave, Rock) causes the GT 5.45
+    // client to crash. Lock area is communicated via SEND_LOCK packet instead.
+    if (
+      this.data.fg === 202 ||
+      this.data.fg === 204 ||
+      this.data.fg === 206 ||
+      this.data.fg === 4710 ||
+      this.data.fg === 5814
+    ) {
+      return this.data.x + this.data.y * this.world.data.width;
+    }
+    return 0;
   }
 
-  private async serializeBlockData(dataBuffer: ExtendBuffer) {
+  public async serializeBlockData(dataBuffer: ExtendBuffer) {
     dataBuffer.writeU16(this.data.fg);
     dataBuffer.writeU16(this.data.bg);
+    // parentIdx encodes the lock tile's position (x + y*width) when LOCKED flag is set.
+    // This is the only place lockPos is written — do NOT add extra bytes below.
     dataBuffer.writeU16(await this.setParentTileIndex(0));
 
     const flags = await this.setFlags(this.data.flags);
 
     dataBuffer.writeU16(flags);
-
-    if (flags & TileFlags.LOCKED) {
-      dataBuffer.grow(2);
-
-      const lockPos = this.data.lockedBy
-        ? (this.data.lockedBy.parentX as number) +
-          (this.data.lockedBy.parentY as number) * this.world.data.width
-        : 0;
-
-      dataBuffer.writeU16(lockPos);
-    }
   }
 
   /**

@@ -1,12 +1,17 @@
 {
   "version": "0.2.0",
+  "compounds": [
+    {
+      "name": "Run Dev & Studio",
+      "configurations": ["tsx", "Drizzle Studio"],
+      "stopAll": true
+    }
+  ],
   "configurations": [
     {
       "name": "tsx",
       "type": "node",
       "request": "launch",
-      // Debug current file in VSCode
-      "program": "${workspaceFolder}/apps/server/src/app.ts",
       /*
        * Path to tsx binary
        * Assuming locally installed
@@ -29,6 +34,18 @@
         // Ignore all dependencies (optional)
         "${workspaceFolder}/node_modules/**"
       ]
+    },
+    {
+      "name": "Drizzle Studio",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "run",
+        "studio"
+      ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ]
 }

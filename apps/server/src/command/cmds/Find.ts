@@ -44,10 +44,10 @@ export default class Find extends Command {
         .addLabelWithIcon("Find the item", "6016", "big")
         .addSpacer("small");
 
-      const items = this.base.items.metadata.items.filter((v) =>
+      const items = this.base.items.metadata.items.filter((v: any) =>
         v.name?.toLowerCase().includes(findItemName.toLowerCase()),
       );
-      items.forEach((item) => {
+      items.forEach((item: any) => {
         const itemID = item.id || 0;
         const itemName = item.name || "";
         if (isSeed) {

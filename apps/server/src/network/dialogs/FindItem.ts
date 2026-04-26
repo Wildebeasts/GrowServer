@@ -29,10 +29,10 @@ export class FindItem {
       .addLabelWithIcon("Find the item", "6016", "big")
       .addSpacer("small");
 
-    const items = this.base.items.metadata.items.filter((v) =>
+    const items = this.base.items.metadata.items.filter((v: any) =>
       v.name?.toLowerCase().includes(this.action.find_item_name.toLowerCase()),
     );
-    items.forEach((item) => {
+    items.forEach((item: any) => {
       const itemID = item.id || 0;
       const itemName = item.name || "";
       if (isSeed) {

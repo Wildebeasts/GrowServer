@@ -27,31 +27,36 @@ export class Info {
   ): Promise<void> {
     const id = parseInt(action.itemID, 10);
     if (isNaN(id)) return this.sendMessage("Invalid item ID.");
-    const item = this.items.get(id);
-    if (!item) return this.sendMessage("Item not found.");
+    
+    let item = this.items.get(id);
+    const itemMeta = this.base.items.metadata.items.get(id.toString());
+    
+    if (!item && !itemMeta) return this.sendMessage("Item not found.");
+
+    const name = item ? item.name : itemMeta!.name;
+    const desc = item && item.desc ? item.desc : "`oNo description available.";
 
     const dlg = new DialogBuilder()
       .defaultColor()
-      .addLabelWithIcon(`\`wAbout ${item.name} (${item.id})`, item.id, "small")
+      .addLabelWithIcon(`\`wAbout ${name} (${id})`, id, "small")
       .addSpacer("small")
-      .addSmallText(item.desc || "`oNo description available.")
+      .addSmallText(desc)
       .addSpacer("small")
       .addSmallText("Rarity: `wTODO");
 
-    if (item.recipe?.splice?.length) {
+    if (item && item.recipe?.splice?.length) {
       const seeds = item.recipe.splice
         .map((sid) => this.items.get(sid)?.name || sid)
         .join(" + ");
-      dlg.addSmallText(`Recipe: ${seeds} = ${item.name}`).addSpacer("small");
+      dlg.addSmallText(`Recipe: ${seeds} = ${name}`).addSpacer("small");
     }
 
     // Check if item has combine property via metadata instead
-    const itemMeta = this.base.items.metadata.items.get(item.id.toString());
     const hasTransmutation = itemMeta && itemMeta.actionType === 34; // ActionType 34 is commonly used for transmutable items
 
     if (hasTransmutation) {
       dlg.addSmallText("`oThis item can be transmuted.");
-    } else if (!item.recipe?.splice?.length) {
+    } else if (!item || !item.recipe?.splice?.length) {
       dlg.addSmallText("`oThis item cannot be spliced.");
     }
 

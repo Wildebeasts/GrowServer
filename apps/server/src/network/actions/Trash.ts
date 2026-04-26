@@ -23,10 +23,10 @@ export class Trash {
       return;
     }
 
-    const item = this.base.items.metadata.items.find((v) => v.id === itemID);
+    const item = this.base.items.metadata.items.find((v: any) => v.id === itemID);
 
     const peerItem = this.peer.data.inventory.items.find(
-      (v) => v.id === itemID,
+      (v: any) => v.id === itemID,
     );
 
     if (!peerItem || peerItem.amount <= 0) {

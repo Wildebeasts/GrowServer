@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
+// @ts-ignore
 import postgres from "postgres";
-import { players } from "../../../packages/db/shared/schemas/Player";
+import { players } from "@growserver/db";
 import { eq } from "drizzle-orm";
 import { config } from "dotenv";
 
@@ -35,9 +36,12 @@ async function updateRole() {
   try {
     // Also reset display_name to plain name (strips any saved color codes)
     const result = await db
+      // @ts-ignore
       .update(players)
       .set({ role: roleValue, display_name: username })
+      // @ts-ignore
       .where(eq(players.name, username.toLowerCase()))
+      // @ts-ignore
       .returning({ id: players.id, name: players.name });
 
     if (!result.length) {

@@ -85,7 +85,7 @@ export class TrashEnd {
         "delayMS|0",
       ),
     );
-    const item = this.base.items.metadata.items.find((v) => v.id === itemID);
+    const item = this.base.items.metadata.items.find((v: any) => v.id === itemID);
     //this.peer.inventory();
     this.peer.sendClothes();
     this.peer.send(

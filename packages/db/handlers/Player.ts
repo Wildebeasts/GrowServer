@@ -75,6 +75,7 @@ export class PlayerDB {
         inventory: JSON.stringify(data.inventory),
         clothing: JSON.stringify(data.clothing),
         gems: data.gems,
+        growtokens: data.growtokens,
         level: data.level,
         exp: data.exp,
         last_visited_worlds: JSON.stringify(data.lastVisitedWorlds),

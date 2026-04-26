@@ -34,7 +34,7 @@ export class DoorEdit {
       parseInt(this.action.tiley) * (this.world?.data.width as number);
     this.block = this.world?.data.blocks[this.pos] as TileData;
     this.itemMeta = this.base.items.metadata.items.find(
-      (i) => i.id === parseInt(action.itemID),
+      (i: any) => i.id === parseInt(action.itemID),
     )!;
   }
 

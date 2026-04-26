@@ -1,27 +1,16 @@
-import { Variant } from "growtopia.js";
 import type { Base } from "../../core/Base";
-import { Peer } from "../../core/Peer";
+import type { Peer } from "../../core/Peer";
 import type { World } from "../../core/World";
 import type { TileData } from "@growserver/types";
-import {
-  LockPermission,
-  ROLE,
-  TileExtraTypes,
-  TileFlags,
-} from "@growserver/const";
 import { ExtendBuffer, DialogBuilder } from "@growserver/utils";
 import { Tile } from "../Tile";
-import { ItemDefinition } from "grow-items";
-
-/** Max items a single Magplant 5000 can store */
-const MAGPLANT_MAX_STORAGE = 5000;
-
-/** Remote variant item IDs */
-const MAGPLANT_REMOTE_IDS = new Set([5640, 5641]);
+import { BlockFlags, LockPermission, TileExtraTypes, TileFlags } from "@growserver/const";
+import type { ItemDefinition } from "grow-items";
+import { Variant } from "growtopia.js";
+import { tileFrom } from ".";
 
 export class MagplantTile extends Tile {
   public extraType = TileExtraTypes.MAGPLANT;
-
   constructor(
     public base: Base,
     public world: World,
@@ -29,345 +18,122 @@ export class MagplantTile extends Tile {
   ) {
     super(base, world, data);
   }
+  public async onPlaceForeground(peer: Peer, itemMeta: ItemDefinition): Promise<boolean> {
+    if (!await super.onPlaceForeground(peer, itemMeta)) return false;
 
-  // ── helpers ────────────────────────────────────────────────────────────────
-
-  private isRemote(): boolean {
-    return MAGPLANT_REMOTE_IDS.has(this.data.fg);
-  }
-
-  private isOwner(peer: Peer): boolean {
-    return (
-      // If magplant data hasn't been initialised yet, treat as unclaimed
-      // so the first person to wrench it (who has lock access) can claim it.
-      !this.data.magplant ||
-      this.data.magplant.ownerUserID === peer.data.userID ||
-      peer.data.role === ROLE.DEVELOPER
-    );
-  }
-
-  // ── lifecycle ──────────────────────────────────────────────────────────────
-
-  public async onPlaceForeground(
-    peer: Peer,
-    itemMeta: ItemDefinition,
-  ): Promise<boolean> {
-    if (!(await super.onPlaceForeground(peer, itemMeta))) return false;
-
-    this.data.flags |= TileFlags.TILEEXTRA;
-
-    this.data.magplant = {
-      ownerUserID: peer.data.userID,
-      targetItemID: 0,
-      storedAmount: 0,
-      enabled: true,
-      buildingMode: false,
-    };
-
-    // Track this tile's position in the world's persistent magplant index.
-    const idx = this.data.x + this.data.y * this.world.data.width;
+    this.data.itemSucker = {
+      itemAmount:       0,
+      itemID: 0,
+      collection: true,
+      building: false,
+      //flags: 0x2,
+      itemLimit: 5000
+    }
+    
     if (!this.world.data.magplantTileIndices) {
-      this.world.data.magplantTileIndices = [idx];
-    } else if (!this.world.data.magplantTileIndices.includes(idx)) {
+      this.world.data.magplantTileIndices = [];
+    }
+    const idx = (this.data.x ?? 0) + (this.data.y ?? 0) * this.world.data.width;
+    if (!this.world.data.magplantTileIndices.includes(idx)) {
       this.world.data.magplantTileIndices.push(idx);
     }
-
-    peer.sendConsoleMessage(
-      "`2Magplant 5000`` placed! Wrench it to configure which item it should collect.",
-    );
-    return true;
-  }
-
-  public async onDestroy(peer: Peer): Promise<void> {
-    // Snapshot stored items then clear BEFORE dropping so the drop loop
-    // cannot re-intercept them into this (now-being-destroyed) magplant.
-    const storedID = this.data.magplant?.targetItemID ?? 0;
-    const storedAmount = this.data.magplant?.storedAmount ?? 0;
-    this.data.magplant = undefined;
-
-    // Remove from the world's persistent magplant index.
-    const idx = this.data.x + this.data.y * this.world.data.width;
-    if (this.world.data.magplantTileIndices) {
-      const pos = this.world.data.magplantTileIndices.indexOf(idx);
-      if (pos !== -1) this.world.data.magplantTileIndices.splice(pos, 1);
-    }
-
-    await super.onDestroy(peer);
-
-    // Drop any stored items back to the ground.
-    if (storedID > 0 && storedAmount > 0) {
-      let toDrop = storedAmount;
-      while (toDrop > 0) {
-        const chunk = Math.min(toDrop, 200);
-        this.world.drop(
-          peer,
-          this.data.x * 32,
-          this.data.y * 32,
-          storedID,
-          chunk,
-          { noSimilar: false },
-        );
-        toDrop -= chunk;
-      }
-    }
-  }
-
-  // ── interaction ────────────────────────────────────────────────────────────
-
-  public async onPunch(peer: Peer): Promise<boolean> {
-    if (
-      !(await this.world.hasTilePermission(
-        peer.data.userID,
-        this.data,
-        LockPermission.BREAK,
-      ))
-    ) {
-      this.sendLockSound(peer);
-      return false;
-    }
-
-    if (!this.isOwner(peer)) {
-      peer.sendTextBubble("Only the owner of this Magplant can use it!", true);
-      this.sendLockSound(peer);
-      return false;
-    }
-
-    const mp = this.data.magplant;
-    if (!mp || mp.targetItemID <= 0) {
-      // No item configured — fall through to normal punch (break)
-      return super.onPunch(peer);
-    }
-
-    // Toggle building mode
-    mp.buildingMode = !mp.buildingMode;
-    const itemName =
-      this.base.items.metadata.items.get(mp.targetItemID.toString())?.name ??
-      "item";
-
-    if (mp.buildingMode) {
-      peer.sendConsoleMessage(
-        "`2Building mode: `$ACTIVE``. Use the MAGPLANT 5000 Remote to build `w" +
-          itemName +
-          "`` directly from the MAGPLANT 5000's storage.",
-      );
-    } else {
-      peer.sendConsoleMessage("`2Building mode: `4DISABLED``.");
-    }
-
-    this.world.every((p) => this.tileUpdate(p));
     return true;
   }
 
   public async onWrench(peer: Peer): Promise<boolean> {
-    // World must be locked for the Magplant to operate
-    const worldOwner = this.world.getOwnerUID();
-    if (!worldOwner) {
-      peer.sendTextBubble(
-        "The Magplant 5000 only works in `$World Locked`` worlds!",
-        false,
-      );
+      const itemMeta = this.base.items.metadata.items.get(this.data.fg.toString())!;
+      if (await this.world.hasTilePermission(peer.data.userID, this.data, LockPermission.BUILD && (itemMeta.flags! & BlockFlags.WRENCHABLE))) {
+        if (!this.data.itemSucker?.itemID){
+            const dialog = new DialogBuilder()
+            .defaultColor()
+            .addLabelWithIcon(
+              `\`w${itemMeta.name}\`\``,
+              itemMeta.id as number,
+              "big"
+            )
+            
+            .addSpacer("small")
+            .addLabel("`6The machine is empty")
+            .addItemPicker("choose_item", "Choose an item", `Choose an item to put in the ${itemMeta.name}`)
+            .embed("tilex", this.data.x!)
+            .embed("tiley", this.data.y!) // i dont think this is included in the official one, but not very sure on it too.
+            .endDialog("magplant_edit", "Cancel", "OK")
+            .str();
+    
+          peer.send(Variant.from("OnDialogRequest", dialog));
+        }else{
+          const itemSucker = this.data.itemSucker
+          const item = this.base.items.metadata.items.get(itemSucker.itemID.toString());
+          const dialog = new DialogBuilder()
+            .defaultColor()
+            .addLabelWithIcon(
+              `\`w${itemMeta.name}\`\``,
+              itemMeta.id as number,
+              "big"
+            )
+            
+            .addSpacer("small")
+            .addLabel(`\`2${item?.name ?? "Unknown Item"}`)
+            .addLabel(itemSucker.itemAmount == 0 ? "`6The machine is currently empty!" : `The machine contains ${itemSucker.itemAmount} \`2${item?.name ?? "Unknown Item"}`) 
+            if(itemSucker.itemAmount < 5000) dialog.addButton("add_item", "Add items to the machine");
+            if(itemSucker.itemAmount >= 1) dialog.addButton("retrieve_item", "Retrieve Items");
+            if(itemSucker.itemAmount == 0) dialog.addItemPicker("change_item", "Change Item", "Change an item")
+            dialog.addLabel(`Building mode: ${!itemSucker.building ? "`5DISABLED" : "`#ACTIVE"}`)
+            itemSucker.building ? dialog.addLabel(`Use the ${itemMeta.name} Remote to build \`2${item?.name ?? "Unknown Item"} \`\`directly from the ${itemMeta.name}'s storage.`) : dialog.addLabel("Punch to activate building mode.");
+            dialog.addButton("get_remote", "Get Remote")
+            .addCheckbox("enable_collection", "Enable Collection.", itemSucker.collection == true ? "selected" : "not_selected")
+            .embed("tilex", this.data.x!)
+            .embed("tiley", this.data.y!) // i dont think this is included in the official one, but not very sure on it too.
+            .endDialog("magplant_edit", "Cancel", "OK")
+            .str();
+    
+          peer.send(Variant.from("OnDialogRequest", dialog.str()));
+        }
+        
+        return true;
+      }
       return false;
     }
 
-    if (!this.isOwner(peer)) {
-      peer.sendTextBubble(
-        "Only the owner of this Magplant can configure it!",
-        true,
-      );
-      this.sendLockSound(peer);
-      return false;
+  public async onPunch(peer: Peer): Promise<boolean> {
+    const itemMeta = this.base.items.metadata.items.get(this.data.fg.toString())!;
+    if (await this.world.hasTilePermission(peer.data.userID, this.data, LockPermission.BREAK)) {
+      // default punch behaviour, but with an exception
+      if (!this.data.itemSucker?.itemID){
+        peer.sendTextBubble(`Cannot activate the ${itemMeta.name}, you need to set the item first.`, true)
+      }else if(this.data.itemSucker.building == false){
+        this.data.itemSucker.building = true;
+      }else {
+        this.data.itemSucker.building = false;
+      }
     }
 
-    // Ensure magplant data exists (may be missing on blocks placed before
-    // this code was deployed, or loaded from an older DB snapshot).
-    if (!this.data.magplant) {
-      this.data.magplant = {
-        ownerUserID: peer.data.userID,
-        targetItemID: 0,
-        storedAmount: 0,
-        enabled: true,
-        buildingMode: false,
-      };
-    }
-    // Migrate older magplant data that may lack newer fields.
-    if (this.data.magplant.enabled === undefined)
-      this.data.magplant.enabled = true;
-    if (this.data.magplant.buildingMode === undefined)
-      this.data.magplant.buildingMode = false;
-
-    const mp = this.data.magplant;
-    const itemMeta = this.base.items.metadata.items.get(
-      this.data.fg.toString(),
-    )!;
-
-    const dialog = new DialogBuilder()
-      .defaultColor("`o")
-      .addLabelWithIcon("`wMAGPLANT 5000``", itemMeta.id as number, "big")
-      .embed("tilex", this.data.x)
-      .embed("tiley", this.data.y);
-
-    if (mp.targetItemID <= 0) {
-      // ── State 1: No item configured ──────────────────────────────────
-      dialog.addTextBox("`6The machine is empty.``");
-      dialog.addItemPicker(
-        "magplant_choose_item",
-        "Choose Item",
-        "Choose Item",
-      );
-      dialog.endDialog("magplant_edit", "Close", "");
-    } else {
-      // ── State 2 & 3: Item configured ─────────────────────────────────
-      const stored = this.base.items.metadata.items.get(
-        mp.targetItemID.toString(),
-      );
-      const itemName = stored?.name ?? "Unknown";
-
-      if (mp.storedAmount > 0) {
-        dialog.addTextBox(
-          "The machine contains `w" +
-            mp.storedAmount +
-            "`` `2" +
-            itemName +
-            "``",
-        );
-        dialog.addButton("magplant_add_items", "Add Items to the machine");
-        dialog.addButton("magplant_retrieve", "Retrieve Items");
-      } else {
-        dialog.addLabelWithIcon(
-          "`2" + itemName + "``",
-          mp.targetItemID,
-          "small",
-        );
-        dialog.addTextBox("`6The machine is currently empty!``");
-        dialog.addButton("magplant_add_items", "Add Items to the machine");
-      }
-
-      dialog.addButton("magplant_change_item", "Change Item");
-
-      // Building mode status
-      if (mp.buildingMode) {
-        dialog.addTextBox(
-          "Building mode: `2ACTIVE``\nUse the MAGPLANT 5000 Remote to build `2" +
-            itemName +
-            "`` directly from the MAGPLANT 5000's storage.",
-        );
-      } else {
-        dialog.addTextBox(
-          "Building mode: `4DISABLED``\nPunch to activate building mode.",
-        );
-      }
-
-      if (!this.isRemote()) {
-        dialog.addButton("magplant_get_remote", "`2Get Remote``");
-      }
-
-      dialog.addCheckbox(
-        "enable_collection",
-        "Enable Collection.",
-        mp.enabled ? "SELECTED" : "NOT_SELECTED",
-      );
-
-      dialog.endDialog("magplant_edit", "Close", "Update");
-    }
-
-    peer.send(Variant.from("OnDialogRequest", dialog.str()));
-    return true;
+    const magplantTile = tileFrom(this.base, this.world, this.data) as MagplantTile;
+    this.world.every((p) => magplantTile.tileUpdate(p));
+    return super.onPunch(peer);
   }
 
-  /**
-   * When a player places an item on the magplant:
-   * - If no target item is configured, set it.
-   * - If it matches the target, add it to storage.
-   * - Otherwise, reject.
-   */
-  public async onItemPlace(peer: Peer, item: ItemDefinition): Promise<boolean> {
-    if (!this.isOwner(peer)) {
-      peer.sendTextBubble("Only the owner can configure this Magplant!", true);
-      return false;
-    }
-
-    const mp = this.data.magplant;
-    if (!mp) return false;
-
-    if (item.id! <= 1) {
-      peer.sendTextBubble(
-        "You can't store that item type in a Magplant!",
-        true,
-      );
-      return false;
-    }
-
-    // No target set yet — configure it
-    if (mp.targetItemID <= 0) {
-      mp.targetItemID = item.id!;
-      const itemName = item.name ?? "item";
-      peer.sendConsoleMessage(
-        "`2Magplant 5000`` is now set to collect `w" + itemName + "``!",
-      );
-      this.world.every((p) => this.tileUpdate(p));
-      return true;
-    }
-
-    // Different item than the configured target
-    if (mp.targetItemID !== item.id) {
-      peer.sendTextBubble(
-        "Change the item first before setting a new one!",
-        true,
-      );
-      return false;
-    }
-
-    // Same item — add to storage
-    const space = MAGPLANT_MAX_STORAGE - mp.storedAmount;
-    if (space <= 0) {
-      peer.sendTextBubble("The machine is full!", true);
-      return false;
-    }
-
-    // Add 1 item from placement
-    mp.storedAmount += 1;
-    peer.removeItemInven(item.id!, 1);
-
-    const itemName = item.name ?? "item";
-    peer.sendConsoleMessage(
-      "`2Added 1 " +
-        itemName +
-        "`` to the machine. (" +
-        mp.storedAmount +
-        "/" +
-        MAGPLANT_MAX_STORAGE +
-        ")",
-    );
+  public async onDestroy(peer: Peer): Promise<void> {
+    await super.onDestroy(peer);
     this.world.every((p) => this.tileUpdate(p));
-    return true;
+    this.data.itemSucker = undefined;
+
+    if (this.world.data.magplantTileIndices) {
+      const idx = (this.data.x ?? 0) + (this.data.y ?? 0) * this.world.data.width;
+      this.world.data.magplantTileIndices = this.world.data.magplantTileIndices.filter((i) => i !== idx);
+    }
   }
-
-  /**
-   * Called by World.drop (with tree:true) to give this magplant a chance to
-   * intercept a matching item drop before it hits the ground.
-   * Returns the number of items actually consumed (0 if none).
-   */
-  public tryCollect(itemID: number, amount: number): number {
-    const mp = this.data.magplant;
-    if (!mp || !mp.enabled || mp.targetItemID !== itemID) return 0;
-    if (mp.storedAmount >= MAGPLANT_MAX_STORAGE) return 0;
-
-    const canCollect = Math.min(amount, MAGPLANT_MAX_STORAGE - mp.storedAmount);
-    mp.storedAmount += canCollect;
-    return canCollect;
-  }
-
-  // ── serialization ──────────────────────────────────────────────────────────
 
   public async serialize(dataBuffer: ExtendBuffer): Promise<void> {
     await super.serialize(dataBuffer);
-
-    const mp = this.data.magplant;
-    // extraType(u8) + targetItemID(u32) + storedAmount(u32) + remotesCount(u8)
-    dataBuffer.grow(10);
+    dataBuffer.grow(15);
     dataBuffer.writeU8(this.extraType);
-    dataBuffer.writeU32(mp?.targetItemID ?? 0);
-    dataBuffer.writeU32(mp?.storedAmount ?? 0);
-    dataBuffer.writeU8(0); // remotes count (not tracked server-side)
+    dataBuffer.writeU32(this.data.itemSucker?.itemID || 0);
+    dataBuffer.writeI32(this.data.itemSucker?.itemAmount ?? 0);
+    dataBuffer.writeU8(this.data.itemSucker?.collection ? 1 : 0);
+    dataBuffer.writeU8(this.data.itemSucker?.building ? 1 : 0);
+    //dataBuffer.writeU16(this.data.itemSucker?.flags || 0x0)
+    dataBuffer.writeI32(this.data.itemSucker?.itemLimit || 5000);
+    return;
   }
 }

@@ -114,7 +114,7 @@ export class TileChangeReq {
     }
 
     const magplantBlock = this.world.data.blocks[link.tileIndex];
-    if (!magplantBlock?.magplant || magplantBlock.fg !== 5638) {
+    if (!magplantBlock?.itemSucker || magplantBlock.fg !== 5638) {
       this.peer.sendTextBubble(
         "The linked Magplant 5000 no longer exists!",
         true,
@@ -123,7 +123,7 @@ export class TileChangeReq {
       return;
     }
 
-    if (!magplantBlock.magplant.buildingMode) {
+    if (!magplantBlock.itemSucker.building) {
       this.peer.sendTextBubble(
         "Building mode is disabled on the linked Magplant. Punch it to activate!",
         true,
@@ -132,8 +132,8 @@ export class TileChangeReq {
     }
 
     if (
-      magplantBlock.magplant.targetItemID <= 0 ||
-      magplantBlock.magplant.storedAmount <= 0
+      magplantBlock.itemSucker.itemID <= 0 ||
+      magplantBlock.itemSucker.itemAmount <= 0
     ) {
       this.peer.sendTextBubble(
         "The linked Magplant 5000 has no items stored!",
@@ -142,9 +142,9 @@ export class TileChangeReq {
       return;
     }
 
-    const mp = magplantBlock.magplant;
+    const mp = magplantBlock.itemSucker;
     const storedItemMeta = this.base.items.metadata.items.get(
-      mp.targetItemID.toString(),
+      mp.itemID.toString(),
     );
     if (!storedItemMeta) return;
 
@@ -186,7 +186,7 @@ export class TileChangeReq {
     }
 
     // Deduct 1 from magplant storage
-    mp.storedAmount -= 1;
+    mp.itemAmount -= 1;
 
     // Broadcast the tile change
     const tank = TankPacket.from({

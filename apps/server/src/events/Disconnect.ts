@@ -1,5 +1,6 @@
 import { Base } from "../core/Base";
 import { World } from "../core/World";
+import { Peer } from "../core/Peer";
 import { tileFrom, tileUpdateMultiple } from "../world/tiles";
 import { TileFlags } from "@growserver/const";
 import { HeartMonitorTile } from "../world/tiles/HeartMonitorTile";
@@ -35,6 +36,12 @@ export class DisconnectListener {
       });
     }
 
+    if (peer) {
+      const peerObj = new Peer(this.base, netID);
+      peerObj.leaveWorld();
+      peerObj.saveToDatabase().catch((e: any) => logger.error(`Failed to save peer ${netID}: ${e}`));
+    }
+    
     logger.info(`Peer ${netID} disconnected`);
     this.base.cache.peers.delete(netID);
   }

@@ -298,18 +298,21 @@ export class LockTile extends Tile {
   public async serialize(dataBuffer: ExtendBuffer): Promise<void> {
     await super.serialize(dataBuffer);
 
-    dataBuffer.grow(10);
-    dataBuffer.writeU8(this.extraType);
-    dataBuffer.writeU8(0x0);
-    dataBuffer.writeU32(this.data.lock!.ownerUserID!);
-    dataBuffer.writeU32(this.data.lock!.adminIDs?.length ?? 0);
-
-    for (const adminId of this.data.lock!.adminIDs ?? []) {
-      dataBuffer.grow(4);
-      dataBuffer.writeU32(adminId);
+    const adminIDs = this.data.lock?.adminIDs ?? [];
+    const totalSize = 1 + 1 + 4 + 4 + (adminIDs.length * 4) + 1 + 7;
+    dataBuffer.grow(totalSize);
+    dataBuffer.writeU8(this.extraType);                         // extraType = 3
+    dataBuffer.writeU8(0x0);                                    // settings
+    dataBuffer.writeU32(this.data.lock!.ownerUserID!);          // ownerUID
+    dataBuffer.writeU32(adminIDs.length);                       // accessCount
+    for (const adminId of adminIDs) {
+      dataBuffer.writeU32(adminId);                             // accessUID
     }
-
-    dataBuffer.grow(8);
+    dataBuffer.writeU8(0x0);                                    // minimumLevel
+    // 7 unknown trailing bytes (zeros)
+    for (let i = 0; i < 7; i++) {
+      dataBuffer.writeU8(0x0);
+    }
     return;
   }
 

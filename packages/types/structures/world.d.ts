@@ -24,6 +24,7 @@ export interface TileData {
   provider?: Provider;
   displayBlock?: DisplayBlock;
   magplant?: Magplant;
+  itemSucker?: ItemSucker;
 }
 
 export interface Provider {
@@ -41,6 +42,15 @@ export interface Magplant {
   enabled: boolean;
   /** Whether building mode is active (place from storage via remote) */
   buildingMode: boolean;
+}
+
+export interface ItemSucker {
+  itemID: number;
+  itemAmount: number;
+  collection: boolean;
+  building: boolean;
+  itemLimit: number;
+  //flags: number;
 }
 
 export interface Mannequin {

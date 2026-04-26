@@ -400,6 +400,7 @@ export class Peer extends OldPeer<PeerData> {
         userID: data.userID,
         role: data.role,
         gems: data.gems,
+        growtokens: data.growtokens,
         clothing: data.clothing,
         exp: data.exp,
         level: data.level,

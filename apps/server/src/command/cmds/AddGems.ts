@@ -164,6 +164,7 @@ export default class AddGems extends Command {
       await this.base.database.db
         .update(players)
         .set({ gems: newGems })
+        // @ts-ignore
         .where(eq(players.id, targetData.id));
 
       this.peer.send(

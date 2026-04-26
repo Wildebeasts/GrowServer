@@ -7,7 +7,7 @@ import { parseUserTarget } from "@growserver/utils";
 import { eq } from "drizzle-orm";
 import { players, Players } from "@growserver/db";
 
-export default class GiveRole extends Command {
+export default class AddGrowtokens extends Command {
   constructor(
     public base: Base,
     public peer: Peer,
@@ -16,14 +16,14 @@ export default class GiveRole extends Command {
   ) {
     super(base, peer, text, args);
     this.opt = {
-      command: ["giverole"],
+      command: ["addgrowtokens"],
       description:
-        "Change a user's role. Use /username for exact name or #id for user ID.",
+        "Add growtokens to a user. Use /username for exact name or #id for user ID.",
       cooldown: 5,
       ratelimit: 1,
       category: "`oBasic",
-      usage: "/giverole <target> <flag>",
-      example: ["/giverole /testuser1 0", "/giverole #172 2"],
+      usage: "/addgrowtokens <target> <amount>",
+      example: ["/addgrowtokens /testuser1 100", "/addgrowtokens #172 100"],
       permission: [ROLE.DEVELOPER],
     };
   }
@@ -33,49 +33,29 @@ export default class GiveRole extends Command {
       this.peer.send(
         Variant.from(
           "OnConsoleMessage",
-          "`4Usage: /giverole <target> <flag>`o\n" +
+          "`4Usage: /addgrowtokens <target> <amount>`o\n" +
             "Target can be:\n" +
             "  `/username` - Find user by exact username\n" +
             "  `#id` - Find user by user ID\n" +
-            "Flags:\n" +
-            "  `00` - Basic (default role)\n" +
-            "  `01` - Supporter\n" +
-            "  `02` - Developer\n" +
-            "Example: `/giverole /testuser1 0` or `/giverole #172 2`",
+            "Example: `/addgrowtokens /testuser1 100` or `/addgrowtokens #172 100`",
         ),
       );
       return;
     }
 
     const targetArg = this.args[0];
-    const roleFlag = parseInt(this.args[1]);
+    const amount = parseInt(this.args[1]);
 
-    // Validate role flag
-    if (isNaN(roleFlag) || roleFlag < 0 || roleFlag > 2) {
+    // Validate amount
+    if (isNaN(amount) || amount <= 0) {
       this.peer.send(
         Variant.from(
           "OnConsoleMessage",
-          "`4Invalid role flag. Use 0 (Basic), 1 (Supporter), or 2 (Developer).``",
+          "`4Invalid amount. Please provide a positive number.``",
         ),
       );
       return;
     }
-
-    // Map flag to role
-    const roleMap: { [key: number]: string } = {
-      0: ROLE.BASIC,
-      1: ROLE.SUPPORTER,
-      2: ROLE.DEVELOPER,
-    };
-
-    const roleNameMap: { [key: number]: string } = {
-      0: "Basic",
-      1: "Supporter",
-      2: "Developer",
-    };
-
-    const newRole = roleMap[roleFlag];
-    const roleName = roleNameMap[roleFlag];
 
     // Parse user target
     const parsedTarget = parseUserTarget(targetArg);
@@ -142,84 +122,69 @@ export default class GiveRole extends Command {
       }
     }
 
-    // Change role for the target user
+    // Add growtokens to the target user
     if (targetPeer) {
       // User is online
-      const oldRole = targetPeer.data.role;
-      targetPeer.data.role = newRole;
-      await targetPeer.updateDisplayName();
+      targetPeer.addItemInven(1486, amount);
+      targetPeer.inventory(); // Sends inventory update packet to the client
+      
+      const newTokens = targetPeer.data.inventory.items.find(i => i.id === 1486)?.amount || 0;
 
-      const currentWorld = targetPeer.currentWorld();
-      if (currentWorld) {
-        await currentWorld.every((p) => {
-          p.send(
-            Variant.from(
-              { netID: targetPeer.data.netID },
-              "OnNameChanged",
-              targetPeer.data.displayName,
-            ),
-          );
-        });
-      }
+      // Update cache and db
+      await targetPeer.saveToCache();
+      await targetPeer.saveToDatabase();
 
       this.peer.send(
         Variant.from(
           "OnConsoleMessage",
-          "`2Successfully changed role of `o" +
+          "`2Successfully added `o" +
+            amount +
+            "`2 growtokens to `o" +
             targetPeer.data.name +
-            "`2 to `o" +
-            roleName +
-            "`2.``",
+            "`2.``\n" +
+            "`oTotal Tokens: " +
+            newTokens +
+            "``",
         ),
       );
 
       targetPeer.send(
         Variant.from(
           "OnConsoleMessage",
-          "`2Your role has been changed to `o" +
-            roleName +
-            "`2 by an administrator!``",
+          "`2You have received `o" +
+            amount +
+            "`2 growtokens from an administrator! Check your inventory!``",
         ),
       );
     } else if (targetData) {
       // User is offline - update database directly
-      const oldRole = targetData.role;
+      let inv = targetData.inventory ? JSON.parse(targetData.inventory as string) : { max: 32, items: [] };
+      let tokenItem = inv.items.find((i: any) => i.id === 1486);
+      
+      if (tokenItem) {
+        tokenItem.amount += amount;
+      } else {
+        inv.items.push({ id: 1486, amount });
+      }
 
-      // Update role and display name in database
+      // Update inventory in database
       await this.base.database.db
         .update(players)
-        .set({
-          role: newRole,
-          display_name: targetData.name,
-        })
+        .set({ inventory: JSON.stringify(inv) })
         // @ts-ignore
         .where(eq(players.id, targetData.id));
 
       this.peer.send(
         Variant.from(
           "OnConsoleMessage",
-          "`2Successfully changed role of `o" +
+          "`2Successfully added `o" +
+            amount +
+            "`2 growtokens to `o" +
             targetData.name +
-            "`2 to `o" +
-            roleName +
-            "`2 (offline).``",
+            "`2 (offline).``\n" +
+            "`oThey will see them in their inventory when they log in.``",
         ),
       );
-    }
-  }
-
-  private getDisplayNameForRole(name: string, role: string): string {
-    switch (role) {
-      default:
-      case ROLE.BASIC: {
-        return `\`w${name}\`\``;
-      }
-      case ROLE.SUPPORTER: {
-        return `\`e${name}\`\``;
-      }
-      case ROLE.DEVELOPER: {
-        return `\`b@${name}\`\``;
-      }
     }
   }
 }
